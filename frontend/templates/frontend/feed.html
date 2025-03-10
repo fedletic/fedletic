@@ -1,0 +1,15 @@
+{% extends "frontend/base.html" %}
+
+{% block content %}
+    <h1>Feed</h1>
+    <section>
+        <a href="{% url "frontend-workout-create" %}">New Workout</a>
+    </section>
+    <div>
+        {% for feed_item in feed_items %}
+            <div>
+                {{ feed_item.pk }} {{ feed_item.created_on }}
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}

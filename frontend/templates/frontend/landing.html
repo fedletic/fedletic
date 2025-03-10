@@ -1,0 +1,19 @@
+{% extends "frontend/base.html" %}
+
+{% block content %}
+    <h1>Login</h1>
+    <form method="post" enctype="multipart/form-data" class="text-sm">
+        {% csrf_token %}
+        {{ login_form.as_div }}
+        <button type="submit" name="action" value="login">Login</button>
+    </form>
+    <hr/>
+    <h1>Register</h1>
+    <form method="post" enctype="multipart/form-data" class="text-sm">
+        {% csrf_token %}
+        {{ register_form.as_div }}
+        <button type="submit" name="action" value="register">Register</button>
+    </form>
+    <hr/>
+
+{% endblock %}

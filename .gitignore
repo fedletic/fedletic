@@ -1,0 +1,7 @@
+*.log
+*.pyc
+.venv
+.idea
+.env
+.media
+.DS_Store

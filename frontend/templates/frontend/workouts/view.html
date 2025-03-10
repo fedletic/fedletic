@@ -1,0 +1,29 @@
+{% extends "frontend/base.html" %}
+{% block content %}
+    <h1>{{ workout.name }}</h1>
+    {% if workout.description %}
+        <p>
+            {{ workout.description }}
+        </p>
+    {% endif %}
+    <table>
+        <tbody>
+        <tr>
+            <td>Duration</td>
+            <td>{{ workout.duration }}</td>
+        </tr>
+        <tr>
+            <td>Distance</td>
+            <td>{{ workout.distance_in_meters }}</td>
+        </tr>
+        <tr>
+            <td>Calories Burned</td>
+            <td>{{ workout.calories_burned }}</td>
+        </tr>
+        <tr>
+            <td>Heart Rate</td>
+            <td>{{ workout.heart_rate_min }} / {{ workout.heart_rate_avg }} / {{ workout.heart_rate_max }}</td>
+        </tr>
+        </tbody>
+    </table>
+{% endblock %}

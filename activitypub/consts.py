@@ -1,0 +1,1 @@
+ACTIVITY_TYPE_CREATE = "Create"

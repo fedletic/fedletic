@@ -1,0 +1,14 @@
+{% extends "frontend/base.html" %}
+{% block content %}
+
+
+    <h1>Upload your fit file</h1>
+    <p>
+        Enter your workout details.
+    </p>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_div }}
+        <button type="submit">Upload</button>
+    </form>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fedletic</title>
+    <link rel="stylesheet" href="{% static "frontend/styles/base.css" %}?{{ cache_buster }}" type="text/css"/>
+    {% block head %}{% endblock head %}
+</head>
+<body>
+<div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+    {% block content %}{% endblock %}
+    <footer>
+        <p>
+            Fedletic is a proof of concept for an ActivityPub based system and can break whenever.
+        </p>
+        <p>
+            This web interface should not be the primary way for anyone to interact with Fedletic.
+        </p>
+        {% if request.user.is_authenticated %}
+            <a href="{% url "frontend-feed" %}">Feed</a> |
+            <a href="{% url "frontend-profile" request.user.username %}">My Profile</a> |
+            <a href="{% url "frontend-logout" %}">Log-out</a>
+        {% endif %}
+    </footer>
+</div>
+</body>
+</html>
