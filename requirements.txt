@@ -3,5 +3,6 @@ cryptography==44.0.2
 Django==5.1.6
 httpx==0.28.1
 python-dotenv==1.0.1
+psycopg[binary,pool]==3.2.5
 ipython==9.0.1  # Better REPL
 django_extensions==3.2.3  # For shell_plus
