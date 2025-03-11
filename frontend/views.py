@@ -1,11 +1,16 @@
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.db.transaction import atomic
-from django.http import HttpRequest, JsonResponse
+from django.http import HttpRequest, HttpResponseNotFound, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render, reverse
 from django.views import View
 
-from activitypub.methods import create_actor
+from activitypub.methods import (
+    create_actor,
+    fetch_remote_actor,
+    follow_actor,
+    webfinger_lookup,
+)
 from activitypub.models import Actor
 from fedletic.models import FedleticUser
 from feeds.models import FeedItem
@@ -99,17 +104,55 @@ class FedleticView(View):
 
 class ProfileView(View):
 
+    def post(self, request, webfinger):
+        if "@" not in webfinger:
+            webfinger = f"{webfinger}@{settings.SITE_URL}"
+
+        action = request.POST.get("action")
+        target = Actor.objects.get(webfinger=webfinger)
+
+        if action == "follow":
+            follow_actor(actor=request.user.actor, target=target)
+
+        return self.get(request, webfinger)
+
     def get(self, request, webfinger):
+        # TODO: Refactor this to be less chunky, just yeet it into a separate function.
         if "@" in webfinger:
-            actor = get_object_or_404(Actor, webfinger=webfinger)
+            try:
+                actor = Actor.objects.get(webfinger=webfinger)
+            except Actor.DoesNotExist:
+                from_webfinger = webfinger_lookup(user_id=webfinger)
+
+                if not from_webfinger.get("links"):
+                    return HttpResponseNotFound()
+                actor_url = None
+
+                for link in from_webfinger["links"]:
+                    if link["rel"] == "self":
+                        actor_url = link["href"]
+                        break
+
+                if not actor_url:
+                    return HttpResponseNotFound()
+
+                actor = fetch_remote_actor(actor_url=actor_url)
+
+                if not actor:
+                    return HttpResponseNotFound()
+
         else:
+
             actor = get_object_or_404(
                 Actor, webfinger=f"{webfinger}@{settings.SITE_URL}"
             )
+
+        following = request.user.actor.following.filter(actor=actor).exists()
+
         return render(
             request,
             "frontend/profile.html",
-            {"actor": actor},
+            {"actor": actor, "following": following},
         )
 
 

@@ -1,15 +1,32 @@
 from urllib.parse import unquote
 
+from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 
 from activitypub.models.actor import Actor
 from activitypub.views import ActivityPubBaseView
 
 
-class WebFingerView(ActivityPubBaseView):
-    """Handles WebFinger requests for ActivityPub discovery."""
+class WellKnownNodeInfoView(ActivityPubBaseView):
+    CONTENT_TYPE = "application/jrd+json"
 
+    def get(self, request):
+        path = reverse("nodeinfo")
+        return JsonResponse(
+            {
+                "links": [
+                    {
+                        "rel": "http://nodeinfo.diaspora.software/ns/schema/2.0",
+                        "href": f"https://{settings.SITE_URL}{path}",
+                    }
+                ]
+            }
+        )
+
+
+class WellKnownWebFingerView(ActivityPubBaseView):
     CONTENT_TYPE = "application/jrd+json"
 
     def get(self, request):

@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urlencode
 
 import httpx
 from django.conf import settings
@@ -6,7 +7,9 @@ from django.core.cache import cache
 
 import activitypub.crypto as ap_crypto
 from activitypub.exceptions import UsernameExists
+from activitypub.models import Activity
 from activitypub.models.actor import Actor
+from activitypub.tasks.publish_activity import publish_activity
 from activitypub.utils import get_actor_urls, webfinger_from_url
 
 log = logging.getLogger(__name__)
@@ -36,6 +39,36 @@ def create_actor(username):
     )
 
     return actor
+
+
+def webfinger_lookup(user_id):
+    """
+    Perform a WebFinger lookup for a Fediverse user.
+
+    Args:
+        user_id (str): The user ID in the format username@domain.tld
+
+    Returns:
+        dict: The WebFinger JSON response data
+
+    Raises:
+        ValueError: If the user_id format is invalid
+        httpx.HTTPError: If the HTTP request fails
+    """
+    if "@" not in user_id:
+        raise ValueError("User ID must be in the format username@domain.tld")
+
+    _, domain = user_id.split("@", 1)
+
+    base_url = f"https://{domain}/.well-known/webfinger"
+    params = {"resource": f"acct:{user_id}"}
+    url = f"{base_url}?{urlencode(params)}"
+    headers = {"Accept": "application/jrd+json, application/json"}
+    response = httpx.get(url, follow_redirects=True, headers=headers)
+    response.raise_for_status()
+
+    # Return the JSON response
+    return response.json()
 
 
 def fetch_remote_actor(actor_url):
@@ -100,3 +133,29 @@ def fetch_remote_actor(actor_url):
     except Exception as e:
         log.error(f"Error fetching remote actor {actor_url}: {str(e)}")
         return None
+
+
+def follow_actor(actor: Actor, target: Actor):
+    """
+    Creates a Follow activity from one actor to another.
+
+    Args:
+        actor (Actor): The actor initiating the follow request
+        target (Actor): The actor being followed
+
+    Returns:
+        Activity: The created Follow activity
+    """
+    # Standard ActivityPub context
+    context = ["https://www.w3.org/ns/activitystreams"]
+
+    # Create the Follow activity
+    activity = Activity.create_from_kwargs(
+        actor=actor,
+        target=target,
+        context=context,
+        activity_type="Follow",
+        activity_object=target.actor_url,
+    )
+
+    publish_activity(activity_id=activity.pk, inbox_url=target.inbox_url)

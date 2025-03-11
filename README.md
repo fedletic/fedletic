@@ -14,7 +14,10 @@ else is subject to change.
 * `python3 -m venv .venv`
 * `source .venv/bin/activate`
 * `pip install -r requirements.txt`
-* `cp`
+* `cp .sample.env .env` and adjust to your environment.
+* `./manage.py migrate` to setup up your database.
+
+You can now use the built-in development server to run `./manage.py runserver`
 
 ### Docker
 

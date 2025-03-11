@@ -164,3 +164,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "fedletic.FedleticUser"
 
 MEDIA_ROOT = os.environ.get("MEDIA_ROOT")
+
+MAJOR_VERSION = "0"
+MINOR_VERSION = "1"
+PATCH_VERSION = "0"
+VERSION = ".".join([MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION])
