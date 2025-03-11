@@ -15,37 +15,36 @@ log = logging.getLogger(__name__)
 
 
 def process_follow(activity):
-    if activity.activity_type == "Follow":
-        actor = activity.actor
-        target = Actor.objects.get(
-            webfinger=webfinger_from_url(actor_url=activity.object_uri)
+    actor = activity.actor
+    target = Actor.objects.get(
+        webfinger=webfinger_from_url(actor_url=activity.object_uri)
+    )
+
+    try:
+        Follower.objects.create(
+            actor=actor,
+            target=target,
+        )
+    except IntegrityError:
+        log.info(
+            "Follower relation between actor=%s and target=%s already exists",
+            actor,
+            target,
         )
 
-        try:
-            Follower.objects.create(
-                actor=actor,
-                target=target,
-            )
-        except IntegrityError:
-            log.info(
-                "Follower relation between actor=%s and target=%s already exists",
-                actor,
-                target,
-            )
-
-        accept_activity = Activity.create_from_kwargs(
-            actor=target,
-            target=actor,
-            context="https://www.w3.org/ns/activitystreams",
-            activity_type="Accept",
-            activity_object={
-                "id": activity.id,
-                "type": "Follow",
-                "actor": actor.actor_url,
-                "object": target.actor_url,
-            },
-        )
-        publish_activity.delay_on_commit(accept_activity.pk)
+    accept_activity = Activity.create_from_kwargs(
+        actor=target,
+        target=actor,
+        context="https://www.w3.org/ns/activitystreams",
+        activity_type="Accept",
+        activity_object={
+            "id": activity.id,
+            "type": "Follow",
+            "actor": actor.actor_url,
+            "object": target.actor_url,
+        },
+    )
+    publish_activity.delay_on_commit(accept_activity.pk)
 
 
 def process_unfollow(activity):
@@ -60,21 +59,12 @@ def process_unfollow(activity):
         target=target,
     ).delete()
 
-    # Create activity to undo.
-    accept_undo_activity = Activity.create_from_kwargs(
-        actor=target,
-        target=actor,
-        context="application/activity+json",
-        activity_type="Undo",
-        activity_object={
-            "id": activity.id,
-            "type": "Follow",
-            "actor": actor.actor_url,
-            "object": target.actor_url,
-        },
-    )
 
-    publish_activity.delay_on_commit(accept_undo_activity.pk)
+def process_accept(activity: Activity):
+    target = activity.actor
+    actor = Actor.objects.get(actor_url=activity.object_json["actor"])
+    log.info("Following accepted. actor=%s target=%s", actor, target)
+    Follower.objects.get_or_create(actor=actor, target=target)
 
 
 @shared_task(base=DjangoTask)
@@ -84,9 +74,14 @@ def process_activity(activity_id):
     """
     activity = Activity.objects.get(pk=activity_id)
 
-    log.info("Processing activity=%s content=%s", activity.id, activity.object_json)
+    log.info("Processing activity=%s content=%s", activity.id, activity.raw_activity)
     if activity.activity_type == "Follow":
         process_follow(activity)
+
+    if activity.activity_type == "Accept":
+        obj_type = activity.object_json["type"]
+        if obj_type == "Follow":
+            process_accept(activity)
 
     if activity.activity_type == "Undo":
         obj_type = activity.object_json["type"]

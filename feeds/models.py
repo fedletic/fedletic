@@ -15,3 +15,7 @@ class FeedItem(models.Model):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey("content_type", "object_id")
     created_on = models.DateTimeField(auto_now_add=True)
+    published_on = models.DateTimeField()
+
+    class Meta:
+        ordering = ("published_on",)

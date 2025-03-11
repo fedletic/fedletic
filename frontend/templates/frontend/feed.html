@@ -8,7 +8,7 @@
     <div>
         {% for feed_item in feed_items %}
             <div>
-                {{ feed_item.pk }} {{ feed_item.created_on }}
+                {% include "frontend/partials/feed-workout.html" %}
             </div>
         {% endfor %}
     </div>

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Fedletic</title>
-    <link rel="stylesheet" href="{% static "frontend/styles/base.css" %}?{{ cache_buster }}" type="text/css"/>
+    <link rel="stylesheet" href="{% static "frontend/styles/compiled.css" %}?{{ cache_buster }}" type="text/css"/>
     {% block head %}{% endblock head %}
 </head>
 <body>
@@ -12,7 +12,7 @@
     {% block content %}{% endblock %}
     <footer>
         <p>
-            Fedletic is a proof of concept for an ActivityPub based system and can break whenever.
+            v{{ version }} Fedletic is a proof of concept for an ActivityPub based system and can break whenever.
         </p>
         <p>
             This web interface should not be the primary way for anyone to interact with Fedletic.

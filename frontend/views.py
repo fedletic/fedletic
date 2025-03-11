@@ -9,6 +9,7 @@ from activitypub.methods import (
     create_actor,
     fetch_remote_actor,
     follow_actor,
+    unfollow_actor,
     webfinger_lookup,
 )
 from activitypub.models import Actor
@@ -113,6 +114,8 @@ class ProfileView(View):
 
         if action == "follow":
             follow_actor(actor=request.user.actor, target=target)
+        elif action == "unfollow":
+            unfollow_actor(actor=request.user.actor, target=target)
 
         return self.get(request, webfinger)
 
@@ -147,11 +150,13 @@ class ProfileView(View):
                 Actor, webfinger=f"{webfinger}@{settings.SITE_URL}"
             )
 
-        following = request.user.actor.following.filter(actor=actor).exists()
+        following = False
+        if request.user.is_authenticated:
+            following = request.user.actor.following.filter(target=actor).exists()
 
         return render(
             request,
-            "frontend/profile.html",
+            "frontend/profile/profile.html",
             {"actor": actor, "following": following},
         )
 
@@ -175,6 +180,7 @@ class CreateWorkoutView(FedleticView):
         form = CreateWorkoutForm(files=request.FILES, data=request.POST)
         if not form.is_valid():
             return self.get(request, form)
+
         workout = create_workout(
             actor=request.user.actor,
             fit_file=form.cleaned_data["fit_file"],
@@ -185,7 +191,7 @@ class CreateWorkoutView(FedleticView):
 
         return redirect(
             reverse(
-                "frontend-workout-view",
+                "frontend-workout",
                 kwargs={
                     "workout_id": workout.anchor.ap_id,
                     "webfinger": request.user.actor.domainless_webfinger,
@@ -236,7 +242,23 @@ class WorkoutNoteView(FedleticView):
         anchor = WorkoutAnchor.objects.get(ap_id=workout_id, actor__webfinger=webfinger)
         return redirect(
             to=reverse(
-                "frontend-workout-view",
+                "frontend-workout",
                 kwargs={"webfinger": webfinger, "workout_id": anchor.ap_id},
             )
+        )
+
+
+class FollowersView(FedleticView):
+
+    def get(self, request, webfinger):
+        return render(
+            request, "frontend/profile/followers.html", {"actor": request.actor}
+        )
+
+
+class FollowingView(FedleticView):
+
+    def get(self, request, webfinger):
+        return render(
+            request, "frontend/profile/following.html", {"actor": request.actor}
         )

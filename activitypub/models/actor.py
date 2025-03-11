@@ -1,6 +1,8 @@
 from typing import List
 
+from django.conf import settings
 from django.db import models
+from django.urls import reverse
 
 from activitypub.utils import generate_ulid
 
@@ -37,6 +39,12 @@ class Actor(models.Model):
     @property
     def domainless_webfinger(self):
         return self.webfinger.split("@")[0]
+
+    @property
+    def local_url(self):
+        # TODO: this can be a field in the DB instead.
+        path = reverse("frontend-profile", kwargs={"webfinger": self.webfinger})
+        return f"https://{settings.SITE_URL}{path}"
 
     @property
     def followers_shared_inboxes(self) -> List[str]:

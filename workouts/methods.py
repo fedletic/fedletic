@@ -228,7 +228,7 @@ def create_workout(actor, fit_file, name=None, summary=None):
 
     anchor = WorkoutAnchor.objects.create(actor=actor)
     local_path = reverse(
-        "frontend-workout-view",
+        "frontend-workout",
         kwargs={
             "webfinger": anchor.actor.domainless_webfinger,
             "workout_id": anchor.ap_id,

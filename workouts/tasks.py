@@ -2,7 +2,7 @@ from activitypub.consts import ACTIVITY_TYPE_CREATE
 from activitypub.models import Activity
 from activitypub.tasks.publish_activity import publish_activity
 from fedletic.celery import app
-from feeds.methods import add_to_feed, distribute_to_feed
+from feeds.methods import distribute_to_feed
 from workouts import methods as wo_methods
 from workouts.consts import WORKOUT_STATUS_FINISHED, WORKOUT_STATUS_PROCESSING
 from workouts.models import WorkoutAnchor
@@ -57,9 +57,5 @@ def process_workout(anchor_id):
 
     # TODO: Publish the workout activity.
 
-    # Next up, we share it to local followers.
-    for follower in anchor.actor.followers.filter(target__is_remote=False):
-        distribute_to_feed(source=follower.actor, content_object=anchor)
-
-    # And make sure it shows up in the feed of the creating actor, too.
-    add_to_feed(source=anchor.actor, target=anchor.actor, content_object=anchor)
+    # Next up, we share it to local followers + own user.
+    distribute_to_feed(source=anchor.actor, content_object=anchor)

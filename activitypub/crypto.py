@@ -84,9 +84,9 @@ def verify_http_signature(request):
     actor_url = key_id.replace("#main-key", "")
 
     # Log incoming signature details for debugging
-    log.info(f"Actor URL from keyId: {actor_url}")
-    log.info(f"Headers to verify: {headers_list}")
-    log.info(f"Full headers={dict(request.headers)}")
+    log.debug(f"Actor URL from keyId: {actor_url}")
+    log.debug(f"Headers to verify: {headers_list}")
+    log.debug(f"Full headers={dict(request.headers)}")
 
     # Find actor by URL, not just username
     # You'll need to adjust this based on your Actor model structure
@@ -110,7 +110,7 @@ def verify_http_signature(request):
     # Load public key
     try:
         public_key = load_pem_public_key(actor.public_key.encode())
-        log.info(f"Successfully loaded public key for {actor.webfinger}")
+        log.debug(f"Successfully loaded public key for {actor.webfinger}")
     except Exception as e:
         log.warning("Invalid public key for actor=%s: %s", actor.id, str(e))
         return False, f"Invalid public key: {str(e)}"
@@ -132,7 +132,7 @@ def verify_http_signature(request):
     signing_string = "\n".join(signing_parts)
 
     # Log the reconstructed signing string for debugging
-    log.info(f"Reconstructed signing string: {signing_string}")
+    log.debug(f"Reconstructed signing string: {signing_string}")
 
     # Verify signature
     try:
@@ -142,7 +142,7 @@ def verify_http_signature(request):
             padding.PKCS1v15(),
             hashes.SHA256(),
         )
-        log.info(f"Signature verified successfully for {actor.webfinger}")
+        log.debug(f"Signature verified successfully for {actor.webfinger}")
         return True, "Valid signature"
     except Exception as e:
         log.warning(

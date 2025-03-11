@@ -7,7 +7,7 @@ from django.core.cache import cache
 
 import activitypub.crypto as ap_crypto
 from activitypub.exceptions import UsernameExists
-from activitypub.models import Activity
+from activitypub.models import Activity, Follower
 from activitypub.models.actor import Actor
 from activitypub.tasks.publish_activity import publish_activity
 from activitypub.utils import get_actor_urls, webfinger_from_url
@@ -146,16 +146,29 @@ def follow_actor(actor: Actor, target: Actor):
     Returns:
         Activity: The created Follow activity
     """
-    # Standard ActivityPub context
-    context = ["https://www.w3.org/ns/activitystreams"]
-
     # Create the Follow activity
     activity = Activity.create_from_kwargs(
         actor=actor,
         target=target,
-        context=context,
         activity_type="Follow",
         activity_object=target.actor_url,
     )
 
     publish_activity(activity_id=activity.pk, inbox_url=target.inbox_url)
+
+
+def unfollow_actor(actor: Actor, target: Actor):
+    # Create the Unfollow activity
+    activity = Activity.create_from_kwargs(
+        actor=actor,
+        target=target,
+        activity_type="Undo",
+        activity_object={
+            "type": "Follow",
+            "actor": actor.actor_url,
+            "object": target.actor_url,
+        },
+    )
+    publish_activity(activity_id=activity.pk, inbox_url=target.inbox_url)
+    log.info("Unfollowing actor=%s target=%s", actor, target)
+    Follower.objects.filter(actor=actor, target=target).delete()

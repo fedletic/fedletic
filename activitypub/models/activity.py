@@ -75,8 +75,11 @@ class Activity(models.Model):
 
     @staticmethod
     def create_from_kwargs(
-        actor, target, context, activity_type, activity_object, **kwargs
+        actor, target, activity_type, activity_object, context=None, **kwargs
     ):
+        if not context:
+            context = ["https://www.w3.org/ns/activitystreams"]
+
         activity_id = str(ulid.new())
         activity_id = f"https://{settings.SITE_URL}/activities/{activity_id}"
 

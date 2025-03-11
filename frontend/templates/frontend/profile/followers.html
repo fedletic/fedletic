@@ -1,0 +1,14 @@
+{% extends "frontend/base.html" %}
+
+{% block content %}
+    <h1>Followers</h1>
+    <ul>
+        {% for rel in actor.followers.all %}
+            <li>
+                <a href="{{ rel.actor.local_url }}">
+                    {{ rel.actor.webfinger }}
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock %}
