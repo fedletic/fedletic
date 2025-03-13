@@ -8,8 +8,8 @@ from .models import FeedItem
 def distribute_to_feed(source: Actor, content_object):
 
     published_on = (
-        content_object.workout.start_time
-        if content_object.workout.start_time
+        content_object.start_time
+        if content_object.start_time
         else datetime.datetime.now()
     )
 

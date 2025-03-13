@@ -18,8 +18,39 @@ from feeds.models import FeedItem
 from frontend.forms import LoginForm, RegisterForm
 from workouts.forms import CreateWorkoutForm
 from workouts.methods import create_workout
-from workouts.models import WorkoutAnchor
+from workouts.models import Workout
 from workouts.tasks import process_workout
+
+
+def handle_register(request):
+    form = RegisterForm(data=request.POST)
+    if not form.is_valid():
+        return form, None
+    email = form.cleaned_data["email"]
+    password = form.cleaned_data["password"]
+    user = FedleticUser.objects.create_user(
+        username=email, email=email, password=password
+    )
+    user.actor = create_actor(
+        username=form.cleaned_data["username"],
+    )
+    user.save()
+    return form, user
+
+
+def handle_login(request):
+    form = LoginForm(data=request.POST)
+    if not form.is_valid():
+        return form, None
+    user = authenticate(
+        request,
+        username=form.cleaned_data["username"],
+        password=form.cleaned_data["password"],
+    )
+    if not user:
+        form.add_error(field="username", error="Invalid username or password")
+        return form, None
+    return form, user
 
 
 class LandingView(View):
@@ -29,33 +60,14 @@ class LandingView(View):
         action = request.POST.get("action")
 
         if action == "register":
-            form = RegisterForm(data=request.POST)
-            if not form.is_valid():
+            form, user = handle_register(request=request)
+            if not user:
                 return self.get(request, register_form=form)
-            username = form.cleaned_data["username"]
-            email = form.cleaned_data["email"]
-            password = form.cleaned_data["password"]
-            user = FedleticUser.objects.create_user(
-                username=username, email=email, password=password
-            )
-            user.actor = create_actor(
-                username=form.cleaned_data["username"],
-            )
-            user.save()
-
             login(request, user)
 
         if action == "login":
-            form = LoginForm(data=request.POST)
-            if not form.is_valid():
-                return self.get(request, login_form=form)
-            user = authenticate(
-                request,
-                username=form.cleaned_data["username"],
-                password=form.cleaned_data["password"],
-            )
+            form, user = handle_login(request=request)
             if not user:
-                form.add_error(field="username", error="Invalid username or password")
                 return self.get(request, login_form=form)
             login(request, user)
 
@@ -75,10 +87,16 @@ class LandingView(View):
 
 
 class FedleticView(View):
+    REQUIRES_AUTH = False
+
     def get_ap(self, request, *args, **kwargs):
         raise NotImplementedError
 
     def dispatch(self, request: HttpRequest, *args, **kwargs):
+
+        if self.REQUIRES_AUTH and not request.user.is_authenticated:
+            return redirect(to=reverse("frontend-landing"))
+
         # Handle actor extraction first
         actor = None
         if "webfinger" in kwargs:
@@ -101,6 +119,50 @@ class FedleticView(View):
 
         # Otherwise continue with normal view handling
         return super().dispatch(request, *args, **kwargs)
+
+
+class LoginView(View):
+
+    def post(self, request):
+        form = LoginForm(data=request.POST)
+        next_page = request.GET.get("next")
+        if not form.is_valid():
+            return self.get(request, form=form)
+        user = authenticate(
+            username=form.cleaned_data["username"],
+            password=form.cleaned_data["password"],
+        )
+
+        if not user:
+            form.add_error(field="username", error="Invalid username or password.")
+            return self.get(request, form=form)
+        login(request, user)
+
+        if next_page:
+            return redirect(to=next_page)
+
+        return redirect(to=reverse("frontend-feed"))
+
+    def get(self, request, form=None):
+        if not form:
+            form = LoginForm()
+        return render(request, "frontend/accounts/login.html", {"form": form})
+
+
+class RegisterView(View):
+
+    def post(self, request):
+        form, user = handle_register(request)
+        if not user:
+            return self.get(request, form)
+
+        login(request, user)
+        return redirect(to=reverse("frontend-feed"))
+
+    def get(self, request, form=None):
+        if not form:
+            form = RegisterForm()
+        return render(request, "frontend/accounts/register.html", {"form": form})
 
 
 class ProfileView(View):
@@ -185,15 +247,14 @@ class CreateWorkoutView(FedleticView):
             actor=request.user.actor,
             fit_file=form.cleaned_data["fit_file"],
             name=form.cleaned_data.get("name"),
-            summary=form.cleaned_data.get("summary"),
         )
-        process_workout.delay_on_commit(anchor_id=workout.anchor.id)
+        process_workout.delay_on_commit(workout_id=workout.id)
 
         return redirect(
             reverse(
                 "frontend-workout",
                 kwargs={
-                    "workout_id": workout.anchor.ap_id,
+                    "workout_id": workout.ap_id,
                     "webfinger": request.user.actor.domainless_webfinger,
                 },
             )
@@ -219,8 +280,7 @@ class WorkoutView(FedleticView):
         if "@" not in webfinger:
             webfinger = f"{webfinger}@{settings.SITE_URL}"
 
-        anchor = WorkoutAnchor.objects.get(ap_id=workout_id, actor__webfinger=webfinger)
-        workout = anchor.workout
+        workout = Workout.objects.get(ap_id=workout_id, actor__webfinger=webfinger)
 
         return render(
             request,
@@ -233,13 +293,13 @@ class WorkoutNoteView(FedleticView):
     def get_ap(self, request, webfinger, workout_id, *args, **kwargs):
         if "@" not in webfinger:
             webfinger = f"{webfinger}@{settings.SITE_URL}"
-        anchor = WorkoutAnchor.objects.get(ap_id=workout_id, actor__webfinger=webfinger)
+        anchor = Workout.objects.get(ap_id=workout_id, actor__webfinger=webfinger)
         return JsonResponse(anchor.as_activitypub_object())
 
     def get(self, request, webfinger, workout_id):
         if "@" not in webfinger:
             webfinger = f"{webfinger}@{settings.SITE_URL}"
-        anchor = WorkoutAnchor.objects.get(ap_id=workout_id, actor__webfinger=webfinger)
+        anchor = Workout.objects.get(ap_id=workout_id, actor__webfinger=webfinger)
         return redirect(
             to=reverse(
                 "frontend-workout",

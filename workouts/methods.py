@@ -2,11 +2,13 @@ import datetime
 import logging
 
 from django.conf import settings
+from django.db.transaction import atomic
 from django.urls import reverse
 from garmin_fit_sdk import Decoder, Stream
 
+from workouts.consts import WORKOUT_TYPES_LIST
 from workouts.exceptions import FitFileException
-from workouts.models import CyclingWorkout, WorkoutAnchor
+from workouts.models import Workout
 
 log = logging.getLogger(__name__)
 
@@ -222,36 +224,39 @@ def validate_fit_file(fit_file):
     return messages
 
 
+@atomic
 def create_workout(actor, fit_file, name=None, summary=None):
+
     messages = validate_fit_file(fit_file)
     session = messages["session_mesgs"][0]
+    workout_type = session["sport"]
 
-    anchor = WorkoutAnchor.objects.create(actor=actor)
+    if not name:
+        name = f"Workout on {datetime.datetime.now().strftime('%Y-%m-%d')}"
+
+    if workout_type not in WORKOUT_TYPES_LIST:
+        raise ValueError(f"Invalid workout {workout_type}")
+
+    workout = Workout.objects.create(
+        actor=actor,
+        name=name,
+        summary=summary,
+        workout_type=workout_type,
+        fit_file=fit_file,
+    )
+
     local_path = reverse(
         "frontend-workout",
         kwargs={
-            "webfinger": anchor.actor.domainless_webfinger,
-            "workout_id": anchor.ap_id,
+            "webfinger": workout.actor.domainless_webfinger,
+            "workout_id": workout.ap_id,
         },
     )
 
     # TODO: fugly, but it is what it is.
-    anchor.ap_uri = f"https://{settings.SITE_URL}{local_path}"
-    anchor.local_uri = anchor.ap_uri
-    anchor.save()
-
-    if session["sport"] == "cycling":
-        if not name:
-            name = f"Cycling - {datetime.datetime.now().strftime('%Y-%m-%d')}"
-
-        workout = CyclingWorkout.objects.create(
-            name=name,
-            summary=summary,
-            anchor=anchor,
-            fit_file=fit_file,
-        )
-    else:
-        raise ValueError("Unsupported workout.")
+    workout.ap_uri = f"https://{settings.SITE_URL}{local_path}"
+    workout.local_uri = workout.ap_uri
+    workout.save()
 
     return workout
 

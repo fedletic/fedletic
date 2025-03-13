@@ -1,94 +1,282 @@
+import dataclasses
 import datetime
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from django.db import models
+from django.urls import reverse
 
 from activitypub.utils import generate_ulid
-from workouts.consts import WORKOUT_STATUS_PENDING, WORKOUT_STATUSES_CHOICES
+from workouts.consts import (
+    WORKOUT_CYCLING,
+    WORKOUT_RUNNING,
+    WORKOUT_STATUS_PENDING,
+    WORKOUT_STATUSES_CHOICES,
+    WORKOUT_TYPES_CHOICES,
+)
 
 
-class WorkoutAnchor(models.Model):
-    ap_id = models.CharField(default=generate_ulid)
-    # The AP uri on either our local, or remote server.
-    ap_uri = models.URLField(max_length=1024)
-    # The AP uri on our local server
-    local_uri = models.URLField(max_length=1024)
+@dataclasses.dataclass
+class QuickViewAttribute:
+    label: str
+    value: str
+
+
+class BaseWorkoutMixin(models.Model):
+    """Base fields for all workouts."""
+
+    name = models.CharField(max_length=255)
+    summary = models.TextField(null=True, blank=True)
+    status = models.CharField(
+        max_length=32, default=WORKOUT_STATUS_PENDING, choices=WORKOUT_STATUSES_CHOICES
+    )
+    fit_file = models.FileField(upload_to="fit-files", null=True, blank=True)
+
+    # Time-related fields
+    start_time = models.DateTimeField(null=True, blank=True)
+    end_time = models.DateTimeField(null=True, blank=True)
+    duration = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Duration in seconds"
+    )
+
+    class Meta:
+        abstract = True
+
+    @property
+    def duration_display(self):
+        seconds = self.duration if self.duration else 0
+        hours = seconds // 3600
+        seconds %= 3600
+        minutes = seconds // 60
+        seconds %= 60
+
+        time_parts = []
+        if hours > 0:
+            time_parts.append(f"{hours}h")
+        if minutes > 0 or hours > 0:
+            time_parts.append(f"{minutes}m")
+        time_parts.append(f"{seconds}s")
+
+        return "".join(time_parts)
+
+
+class DistanceMixin(models.Model):
+    """Fields for workouts that involve distance."""
+
+    distance_in_meters = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        abstract = True
+
+    @property
+    def distance_in_meters_display(self):
+        meters = self.distance_in_meters if self.distance_in_meters else 0
+
+        if meters >= 1000:
+            km = meters / 1000
+            if km == int(km):
+                return f"{int(km)}.0 km"
+            elif km * 10 == int(km * 10):
+                return f"{km:.1f} km"
+            else:
+                return f"{km:.2f} km"
+        else:
+            return f"{int(meters)} m"
+
+
+class PhysiologicalMetricsMixin(models.Model):
+    """Physiological metrics common to various workouts."""
+
+    calories_burned = models.PositiveIntegerField(null=True, blank=True)
+    heart_rate_min = models.IntegerField(null=True, blank=True)
+    heart_rate_avg = models.IntegerField(null=True, blank=True)
+    heart_rate_max = models.IntegerField(null=True, blank=True)
+    time_in_hr_zones = models.JSONField(null=True, blank=True)
+
+    # Training effect metrics
+    training_effect_aerobic = models.FloatField(null=True, blank=True)
+    training_effect_anaerobic = models.FloatField(null=True, blank=True)
+    vo2_max = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        abstract = True
+
+    @property
+    def calories_burned_display(self):
+        calories_burned = self.calories_burned if self.calories_burned else 0
+        return f"{calories_burned} kcal"
+
+
+class EnvironmentalMetricsMixin(models.Model):
+    """Environmental metrics for outdoor workouts."""
+
+    altitude_min = models.FloatField(null=True, blank=True)
+    altitude_max = models.FloatField(null=True, blank=True)
+    altitude_avg = models.FloatField(null=True, blank=True)
+    temperature_min = models.IntegerField(null=True, blank=True)
+    temperature_max = models.IntegerField(null=True, blank=True)
+    temperature_avg = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        abstract = True
+
+
+class ActivityPubMixin(models.Model):
+    """ActivityPub integration fields and methods."""
+
+    ap_id = models.CharField(max_length=255, default=generate_ulid)
+    ap_uri = models.URLField(max_length=1024, null=True, blank=True)
+    local_uri = models.URLField(max_length=1024, null=True, blank=True)
+    actor = models.ForeignKey(
+        "activitypub.Actor",
+        related_name="%(class)s_workouts",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
     workout_activities = models.ManyToManyField(
         "activitypub.Activity", related_name="workout_activities"
     )
     note_activities = models.ManyToManyField(
         "activitypub.Activity", related_name="note_activities"
     )
-    actor = models.ForeignKey(
-        "activitypub.Actor", related_name="workout_anchors", on_delete=models.CASCADE
-    )
 
-    @property
-    def workout(self):
-        if hasattr(self, "runworkout_workout"):
-            return self.runworkout_workout
-        if hasattr(self, "cyclingworkout_workout"):
-            return self.cyclingworkout_workout
-        if hasattr(self, "swimworkout_workout"):
-            return self.swimworkout_workout
+    class Meta:
+        abstract = True
+
+    @staticmethod
+    def create_from_activitypub_object(
+        ap_object: Dict[str, Any], actor=None
+    ) -> "Workout":
+        """
+        Create a Workout instance from an ActivityPub object.
+
+        Parameters:
+        ap_object (Dict[str, Any]): The ActivityPub object
+        actor (Actor, optional): The Actor to associate with this workout
+
+        Returns:
+        Workout: A new Workout instance
+        """
+        # Extract the workout object if this is a Create activity
+        if ap_object.get("type") == "Create" and "object" in ap_object:
+            workout_object = ap_object["object"]
+        else:
+            workout_object = ap_object
+
+        # Extract basic properties
+        workout_type = workout_object.get("type")
+
+        # Create a new workout instance
+        workout = Workout(
+            name=workout_object.get("name", "Imported Workout"),
+            summary=workout_object.get("content"),
+            workout_type=workout_type,
+            ap_id=workout_object.get("id"),
+            actor=actor,
+        )
+
+        # Handle published date as start_time
+        if "published" in workout_object:
+            try:
+                workout.start_time = datetime.datetime.fromisoformat(
+                    workout_object["published"]
+                )
+            except (ValueError, TypeError):
+                pass
+
+        # Process fedletic namespace properties
+        for key, value in workout_object.items():
+            if not key.startswith("fedletic:"):
+                continue
+
+            field_name = key.replace("fedletic:", "")
+
+            # Skip if the field doesn't exist on the model
+            if not hasattr(workout, field_name):
+                continue
+
+            # Get the field type to handle conversions
+            field = workout._meta.get_field(field_name)
+
+            # Handle different field types
+            if isinstance(field, models.DateTimeField) and value:
+                try:
+                    setattr(workout, field_name, datetime.datetime.fromisoformat(value))
+                except (ValueError, TypeError):
+                    continue
+            elif isinstance(field, (models.FloatField, models.IntegerField)) and value:
+                try:
+                    if isinstance(field, models.IntegerField):
+                        value = int(value)
+                    else:
+                        value = float(value)
+                    setattr(workout, field_name, value)
+                except (ValueError, TypeError):
+                    continue
+            else:
+                setattr(workout, field_name, value)
+
+        # Set federation URIs
+        workout.ap_uri = workout_object.get("id")
+        if actor:
+            local_path = reverse("workout_detail", kwargs={"pk": "placeholder"})
+            local_path = local_path.replace("placeholder", str(workout.ap_id))
+            workout.local_uri = local_path
+
+        # Save the workout
+        workout.save()
+
+        return workout
 
     @property
     def note_uri(self):
+        """Get the URI for notes associated with this workout."""
+        if not self.local_uri:
+            return None
         return f"{self.local_uri}/note"
 
-    def get_workout_type(self) -> str:
-        """Return the type of workout as a string."""
-        if hasattr(self, "runworkout_workout"):
-            return "RunWorkout"
-        if hasattr(self, "cyclingworkout_workout"):
-            return "CyclingWorkout"
-        if hasattr(self, "swimworkout_workout"):
-            return "SwimWorkout"
-        return "Workout"
+    def set_activity_pub_uris(self, actor=None, ap_uri=None, local_uri=None):
+        """Set ActivityPub URIs for this workout."""
+        if actor:
+            self.actor = actor
+
+        if not ap_uri:
+            ap_uri = f"https://your-domain.com/workouts/{self.id}"
+        self.ap_uri = ap_uri
+
+        if not local_uri:
+            local_uri = f"/workouts/{self.id}"
+        self.local_uri = local_uri
+
+        self.save()
 
     def as_activitypub_object(self) -> Dict[str, Any]:
-        """
-        Serialize the workout to an ActivityPub object format.
+        """Serialize the workout to an ActivityPub object format."""
+        if not self.actor:
+            raise ValueError("Workout must have an actor to be serialized")
 
-        Returns:
-            Dict[str, Any]: The workout serialized as an ActivityPub object
-        """
-        workout = self.workout
-        if not workout:
-            # Return a minimal object if no workout is associated
-            return {
-                "@context": "https://www.w3.org/ns/activitystreams",
-                "id": self.ap_id,
-                "type": "Workout",
-                "actor": self.actor.profile_url,
-                "published": datetime.datetime.now().isoformat(),
-            }
-
-        # Basic workout object that will be the "object" of the activity
+        # Basic workout object
         workout_object = {
             "id": self.ap_id,
-            "type": self.get_workout_type(),
-            "name": workout.name,
+            "type": self.workout_type,
+            "name": self.name,
             "published": (
-                workout.start_time.isoformat()
-                if workout.start_time
+                self.start_time.isoformat()
+                if self.start_time
                 else datetime.datetime.now().isoformat()
             ),
         }
 
-        # Add description if available
-        if workout.description:
-            workout_object["content"] = workout.description
+        if self.summary:
+            workout_object["content"] = self.summary
 
-        # Add duration
-        if workout.duration:
-            workout_object["fedletic:duration"] = workout.duration
+        if self.duration:
+            workout_object["fedletic:duration"] = self.duration
 
-        # Add workout-specific attributes based on type
-        workout_attributes = self._get_serializable_attributes(workout)
+        workout_attributes = self._get_serializable_attributes()
         workout_object.update(workout_attributes)
 
-        # Create the full ActivityPub activity with the workout as its object
+        # Create the full ActivityPub activity
         return {
             "@context": [
                 "https://www.w3.org/ns/activitystreams",
@@ -100,43 +288,39 @@ class WorkoutAnchor(models.Model):
             "object": workout_object,
         }
 
-    def _get_serializable_attributes(self, workout) -> Dict[str, Any]:
-        """
-        Extract serializable attributes from the workout model.
-        Excludes certain Django model fields and formats others for ActivityPub.
-
-        Args:
-            workout: The workout model instance
-
-        Returns:
-            Dict[str, Any]: Dictionary of serializable workout attributes
-        """
-        # Fields to exclude from serialization
+    def _get_serializable_attributes(self) -> Dict[str, Any]:
+        """Extract serializable attributes from the workout model."""
+        # Fields to exclude
         excluded_fields = [
             "id",
             "name",
-            "anchor",
-            "description",
+            "summary",
             "fit_file",
             "status",
             "_state",
-            "_anchor_cache",
-            "_prefetched_objects_cache",
+            "workout_type",
+            "actor",
+            "ap_id",
+            "ap_uri",
+            "local_uri",
+            "workout_activities",
+            "note_activities",
         ]
 
-        # Get all fields from the model
-        workout_type = type(workout)
         serialized = {}
 
-        # First collect all field values
-        for field in workout_type._meta.get_fields():
+        # Collect field values
+        for field in self._meta.get_fields():
             # Skip excluded fields and relationships
-            if field.name in excluded_fields or isinstance(field, models.ForeignKey):
+            if (
+                field.name in excluded_fields
+                or isinstance(field, models.ForeignKey)
+                or isinstance(field, models.ManyToManyField)
+            ):
                 continue
 
             try:
-                value = getattr(workout, field.name)
-                # Skip empty values
+                value = getattr(self, field.name)
                 if value is None:
                     continue
 
@@ -144,80 +328,17 @@ class WorkoutAnchor(models.Model):
                 if isinstance(field, models.DateTimeField) and value:
                     value = value.isoformat()
 
-                # Format JSONField values
-                if isinstance(field, models.JSONField) and value:
-                    # Already a dict, no need to convert
-                    pass
-
-                # Use the fedletic namespace for domain-specific fields
+                # Use fedletic namespace
                 serialized[f"fedletic:{field.name}"] = value
             except AttributeError:
-                # Skip attributes that don't exist
                 continue
-
-        # Add specialized data based on workout type
-        if hasattr(workout, "distance_in_meters") and workout.distance_in_meters:
-            serialized["fedletic:distance"] = {
-                "type": "Distance",
-                "fedletic:meters": workout.distance_in_meters,
-            }
 
         return serialized
 
 
-class Workout(models.Model):
-    name = models.CharField(max_length=255)
-    anchor = models.OneToOneField(
-        WorkoutAnchor,
-        on_delete=models.CASCADE,
-        related_name="%(class)s_workout",
-        null=True,
-        blank=True,
-    )
-    status = models.CharField(
-        max_length=32, default=WORKOUT_STATUS_PENDING, choices=WORKOUT_STATUSES_CHOICES
-    )
-    fit_file = models.FileField(upload_to="fit-files", null=True, blank=True)
-    summary = models.TextField(null=True, blank=True)
-    start_time = models.DateTimeField(
-        null=True, blank=True
-    )  # Start timestamp is crucial
-    end_time = models.DateTimeField(null=True, blank=True)  # End timestamp
-    duration = models.PositiveIntegerField(
-        null=True, blank=True, help_text="Duration in seconds"
-    )
-    calories_burned = models.PositiveIntegerField(null=True, blank=True)
-    heart_rate_min = models.IntegerField(null=True, blank=True)
-    heart_rate_avg = models.IntegerField(null=True, blank=True)
-    heart_rate_max = models.IntegerField(null=True, blank=True)
-    time_in_hr_zones = models.JSONField(null=True, blank=True)
+class RunWorkoutMixin(models.Model):
+    """Running-specific fields and methods."""
 
-    altitude_min = models.FloatField(
-        null=True, blank=True
-    )  # Minimum altitude in meters
-    altitude_max = models.FloatField(
-        null=True, blank=True
-    )  # Maximum altitude in meters
-    altitude_avg = models.FloatField(
-        null=True, blank=True
-    )  # Average altitude in meters
-    temperature_min = models.IntegerField(
-        null=True, blank=True
-    )  # Min temperature in Celsius
-    temperature_max = models.IntegerField(
-        null=True, blank=True
-    )  # Max temperature in Celsius
-    temperature_avg = models.IntegerField(
-        null=True, blank=True
-    )  # Average temperature in Celsius
-
-    class Meta:
-        abstract = True
-
-
-class RunWorkout(Workout):
-
-    distance_in_meters = models.FloatField(null=True, blank=True)
     pace_avg = models.IntegerField(
         help_text="Average pace in seconds per kilometer", null=True, blank=True
     )
@@ -239,70 +360,66 @@ class RunWorkout(Workout):
     ground_contact_time_avg = models.IntegerField(
         help_text="Average ground contact time in ms", null=True, blank=True
     )
-    training_effect_aerobic = models.FloatField(
-        null=True, blank=True
-    )  # Aerobic training effect (0.0-5.0)
-    training_effect_anaerobic = models.FloatField(
-        null=True, blank=True
-    )  # Anaerobic training effect (0.0-5.0)
-    vo2_max = models.FloatField(null=True, blank=True)  # Estimated VO2 Max
     elevation_gain = models.FloatField(null=True, blank=True)
     elevation_loss = models.FloatField(null=True, blank=True)
 
+    class Meta:
+        abstract = True
 
-class SwimWorkout(Workout):
-    distance_in_meters = models.FloatField(null=True, blank=True)
+    @property
+    def pace_display(self):
+        """Format pace in seconds per kilometer to min:sec format."""
+        if not self.pace_avg:
+            return "N/A"
+
+        minutes = self.pace_avg // 60
+        seconds = self.pace_avg % 60
+        return f"{minutes}:{seconds:02d}/km"
+
+
+class SwimWorkoutMixin(models.Model):
+    """Swimming-specific fields and methods."""
+
     pace_avg = models.IntegerField(
         help_text="Average pace in seconds per 100m", null=True, blank=True
     )
     pace_best = models.IntegerField(
         help_text="Best pace in seconds per 100m", null=True, blank=True
     )
-
-    # Pool-specific metrics
     pool_length = models.IntegerField(
         help_text="Pool length in meters", null=True, blank=True
     )
     is_open_water = models.BooleanField(default=False)
-
-    # Stroke metrics
     stroke_count = models.IntegerField(
         help_text="Total number of strokes", null=True, blank=True
     )
     strokes_per_length_avg = models.FloatField(null=True, blank=True)
-
-    # Efficiency metrics
     swolf_avg = models.IntegerField(
         help_text="Average swim golf score (strokes + seconds)", null=True, blank=True
     )
     swolf_best = models.IntegerField(
         help_text="Best swim golf score", null=True, blank=True
     )
-
-    # Stroke types - storing time spent in each stroke type (in seconds)
     freestyle_time = models.IntegerField(null=True, blank=True)
     backstroke_time = models.IntegerField(null=True, blank=True)
     breaststroke_time = models.IntegerField(null=True, blank=True)
     butterfly_time = models.IntegerField(null=True, blank=True)
     drill_time = models.IntegerField(null=True, blank=True)
     mixed_time = models.IntegerField(null=True, blank=True)
-
-    # Rest metrics
     rest_time = models.IntegerField(
         help_text="Total rest time in seconds", null=True, blank=True
     )
-
-    # Specialized metrics
     stroke_rate_avg = models.FloatField(
         help_text="Average strokes per minute", null=True, blank=True
     )
-    training_effect_aerobic = models.FloatField(
-        null=True, blank=True
-    )  # Aerobic training effect (0.0-5.0)
+
+    class Meta:
+        abstract = True
 
 
-class CyclingWorkout(Workout):
-    distance_in_meters = models.FloatField(null=True, blank=True)
+class CyclingWorkoutMixin(models.Model):
+    """Cycling-specific fields and methods."""
+
     speed_avg = models.FloatField(
         help_text="Average speed in m/s", null=True, blank=True
     )
@@ -332,3 +449,69 @@ class CyclingWorkout(Workout):
     )
     elevation_gain = models.FloatField(null=True, blank=True)
     elevation_loss = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        abstract = True
+
+    @property
+    def speed_display(self):
+        """Format speed in m/s to km/h."""
+        if not self.speed_avg:
+            return "N/A"
+
+        # Convert m/s to km/h
+        kmh = self.speed_avg * 3.6
+        return f"{kmh:.1f} km/h"
+
+
+class Workout(
+    BaseWorkoutMixin,
+    DistanceMixin,
+    PhysiologicalMetricsMixin,
+    EnvironmentalMetricsMixin,
+    ActivityPubMixin,
+    RunWorkoutMixin,
+    SwimWorkoutMixin,
+    CyclingWorkoutMixin,
+    models.Model,
+):
+    """
+    Unified workout model that includes fields from all workout types.
+    """
+
+    workout_type = models.CharField(
+        max_length=50, choices=WORKOUT_TYPES_CHOICES, db_index=True
+    )
+
+    class Meta:
+        ordering = ("start_time", "id")
+
+    def get_absolute_url(self):
+        """Generate a URL to view this workout."""
+        return reverse("workout_detail", kwargs={"pk": self.pk})
+
+    @property
+    def quick_view_attrs(self) -> List[QuickViewAttribute]:
+        """Get quick view attributes based on workout type."""
+        attrs = [
+            QuickViewAttribute(
+                label="Duration",
+                value=self.duration_display,
+            ),
+        ]
+        # Add type-specific attributes
+        if self.workout_type in [WORKOUT_RUNNING, WORKOUT_CYCLING]:
+            attrs.append(
+                QuickViewAttribute(
+                    label="Calories",
+                    value=self.calories_burned_display,
+                )
+            )
+            attrs.append(
+                QuickViewAttribute(
+                    label="Distance",
+                    value=self.distance_in_meters_display,
+                )
+            )
+
+        return attrs

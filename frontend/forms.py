@@ -5,9 +5,10 @@ from fedletic.models import FedleticUser
 
 
 class LoginForm(forms.Form):
-    username = forms.CharField(
+    username = forms.EmailField(
         max_length=64,
         required=True,
+        label="email",
     )
     password = forms.CharField(
         required=True, min_length=8, max_length=64, widget=forms.PasswordInput()

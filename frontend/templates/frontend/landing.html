@@ -1,19 +1,48 @@
 {% extends "frontend/base.html" %}
 
 {% block content %}
-    <h1>Login</h1>
-    <form method="post" enctype="multipart/form-data" class="text-sm">
-        {% csrf_token %}
-        {{ login_form.as_div }}
-        <button type="submit" name="action" value="login">Login</button>
-    </form>
-    <hr/>
-    <h1>Register</h1>
-    <form method="post" enctype="multipart/form-data" class="text-sm">
-        {% csrf_token %}
-        {{ register_form.as_div }}
-        <button type="submit" name="action" value="register">Register</button>
-    </form>
-    <hr/>
-
+    <div class="landing">
+        <section class="login-register-card">
+            <div class="p-6 bg-gray-50 border-b border-gray-200">
+                <div class="flex justify-center">
+                    <div class="text-3xl font-bold text-blue-600 flex items-center">
+                        Fedletic
+                    </div>
+                </div>
+                <p class="text-center text-gray-600 mt-2">Decentralized workout tracking, owned by you.</p>
+            </div>
+            <div class="p-6 space-y-6">
+                <form method="post" enctype="multipart/form-data" class="text-sm">
+                    {% csrf_token %}
+                    {{ login_form.as_div }}
+                    <button class="mt-3 button button__primary button__w-full" type="submit" name="action"
+                            value="login">
+                        Login
+                    </button>
+                </form>
+                <div class="relative">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div class="relative flex justify-center text-sm">
+                    <span class="px-2 bg-white text-gray-500">
+                        No account yet?
+                    </span>
+                    </div>
+                </div>
+                <form method="post" enctype="multipart/form-data" class="text-sm">
+                    {% csrf_token %}
+                    {{ register_form.as_div }}
+                    <button class="mt-3 button button__primary button__w-full" type="submit" name="action"
+                            value="register">
+                        Register
+                    </button>
+                </form>
+            </div>
+            <div class="text-xs text-center text-gray-500 p-2">
+                Powered by <a href="https://github.com/fedletic/fedletic" class="text-underline">Fedletic
+                v{{ version }}</a>
+            </div>
+        </section>
+    </div>
 {% endblock %}

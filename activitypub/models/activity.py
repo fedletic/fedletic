@@ -8,7 +8,6 @@ log = logging.getLogger(__name__)
 
 
 class Activity(models.Model):
-
     actor = models.ForeignKey(
         "activitypub.Actor",
         on_delete=models.CASCADE,

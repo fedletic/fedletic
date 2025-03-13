@@ -7,7 +7,6 @@ from workouts.exceptions import FitFileException
 
 class CreateWorkoutForm(forms.Form):
     name = forms.CharField(max_length=128, required=False)
-    summary = forms.CharField(max_length=1024, widget=forms.Textarea, required=False)
     fit_file = forms.FileField()
 
     def clean_fit_file(self):

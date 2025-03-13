@@ -1,3 +1,53 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+    --royal-purple: #6A1B9A;
+    --royal-purple-dark: #4A148C;
+    --royal-purple-light: #9C27B0;
+    --royal-purple-lighter: #CE93D8;
+    --vivid-amber: #FFC107;
+    --vivid-amber-dark: #FFA000;
+    --vivid-amber-light: #FFECB3;
+    --text-dark: #263238;
+    --text-medium: #546E7A;
+    --text-light: #B0BEC5;
+    --white: #FFFFFF;
+    --primary-bg: #121016;
+}
+
+body {
+    @apply bg-gray-900
+}
+
+.landing {
+    @apply bg-gradient-to-br from-blue-500 to-purple-600 min-h-screen flex items-center justify-center p-4;
+}
+
+label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+}
+
+input[type='email'],
+input[type='text'],
+input[type='password'] {
+    @apply focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-3 py-2 sm:text-sm border border-gray-300 rounded-md;
+}
+
+.login-register-card {
+    @apply bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden;
+}
+
+.button {
+    @apply py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium
+}
+
+.button__primary {
+    @apply text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
+}
+
+.button__w-full {
+    @apply w-full flex justify-center
+}
+

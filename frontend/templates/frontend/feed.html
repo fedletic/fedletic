@@ -1,15 +1,27 @@
 {% extends "frontend/base.html" %}
+{% load static %}
+
+{% block title %}Fedletic Feed{% endblock %}
 
 {% block content %}
-    <h1>Feed</h1>
-    <section>
-        <a href="{% url "frontend-workout-create" %}">New Workout</a>
-    </section>
-    <div>
-        {% for feed_item in feed_items %}
-            <div>
-                {% include "frontend/partials/feed-workout.html" %}
+    <!-- Main Content -->
+    <div class="flex">
+        <!-- Left Sidebar -->
+        {% include "frontend/partials/sidebar.html" %}
+        <!-- Middle Content -->
+        <div class="flex-1 max-w-xl mx-auto px-4 py-4">
+            <!-- Workout Post -->
+            {% for feed_item in feed_items %}
+                {% with feed_item.content_object as workout %}
+                    {% include "frontend/partials/feed-workout.html" %}
+                {% endwith %}
+            {% endfor %}
+            <!-- Load More -->
+            <div class="text-center py-4">
+                <button class="text-indigo-400 hover:text-indigo-300 font-medium">
+                    Load More
+                </button>
             </div>
-        {% endfor %}
+        </div>
     </div>
 {% endblock %}

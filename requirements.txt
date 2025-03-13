@@ -1,11 +1,13 @@
-celery==5.4.0
-cryptography==44.0.2
-Django==5.1.6
-httpx==0.28.1
-python-dotenv==1.0.1
+celery~=5.4.0
+cryptography~=44.0.2
+Django~=5.1.6
+httpx~=0.28.1
+python-dotenv~=1.0.1
 psycopg[binary,pool]==3.2.5
 ipython==9.0.1  # Better REPL.
 django_extensions==3.2.3  # For shell_plus.
 ulid-py==1.1.0  # Generating longer IDs.
-garmin-fit-sdk==21.158.0  # For parsing fit workout files.
-pillow==11.1.0  # Handling Image fields
+garmin-fit-sdk==21.158.0  # Parsing fit workout files.
+pillow==11.1.0  # Handling Image fields.
+django-oauth-toolkit==3.0.1  # OAuth provider
+djangorestframework==3.15.2  # API framework.

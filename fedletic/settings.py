@@ -42,6 +42,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_extensions",
+    "oauth2_provider",
+    "apis",
     "activitypub",
     "fedletic",
     "workouts",
@@ -170,3 +172,25 @@ MAJOR_VERSION = "0"
 MINOR_VERSION = "1"
 PATCH_VERSION = "0"
 VERSION = ".".join([MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION])
+
+OAUTH2_PROVIDER_APPLICATION_MODEL = "apis.OAuth2Application"
+
+LOGIN_URL = "/accounts/login"
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
+# OAuth2 settings
+OAUTH2_PROVIDER = {
+    "SCOPES": {
+        "read": "Read scope",
+        "write": "Write scope",
+    },
+    "ACCESS_TOKEN_EXPIRE_SECONDS": 60 * 60 * 24,  # 24 hours
+}

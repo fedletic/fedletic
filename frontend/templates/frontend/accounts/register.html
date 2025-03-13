@@ -1,0 +1,10 @@
+{% extends "frontend/base.html" %}
+
+{% block content %}
+    <h1>Register for an account on Fedletic</h1>
+    <form enctype="multipart/form-data" method="post">
+        {% csrf_token %}
+        {{ form.as_div }}
+        <button>Register</button>
+    </form>
+{% endblock %}
