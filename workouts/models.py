@@ -147,9 +147,7 @@ class ActivityPubMixin(models.Model):
         abstract = True
 
     @staticmethod
-    def create_from_activitypub_object(
-        ap_object: Dict[str, Any], actor=None
-    ) -> "Workout":
+    def create_from_activitypub_object(ap_object: Dict[str, Any], actor) -> "Workout":
         """
         Create a Workout instance from an ActivityPub object.
 
@@ -167,7 +165,7 @@ class ActivityPubMixin(models.Model):
             workout_object = ap_object
 
         # Extract basic properties
-        workout_type = workout_object.get("type")
+        workout_type = workout_object.get("fedletic:workout_type")
 
         # Create a new workout instance
         workout = Workout(
@@ -221,10 +219,11 @@ class ActivityPubMixin(models.Model):
 
         # Set federation URIs
         workout.ap_uri = workout_object.get("id")
-        if actor:
-            local_path = reverse("workout_detail", kwargs={"pk": "placeholder"})
-            local_path = local_path.replace("placeholder", str(workout.ap_id))
-            workout.local_uri = local_path
+        local_path = reverse(
+            "frontend-workout",
+            kwargs={"webfinger": actor.webfinger, "workout_id": workout.ap_id},
+        )
+        workout.local_uri = local_path
 
         # Save the workout
         workout.save()
@@ -261,13 +260,20 @@ class ActivityPubMixin(models.Model):
         # Basic workout object
         workout_object = {
             "id": self.ap_id,
-            "type": self.workout_type,
+            "type": "Workout",
             "name": self.name,
             "published": (
                 self.start_time.isoformat()
                 if self.start_time
                 else datetime.datetime.now().isoformat()
             ),
+            "@context": [
+                "https://www.w3.org/ns/activitystreams",
+                {"fedletic": "https://fedletic.com/ns#"},
+            ],
+            "attributedTo": self.actor.actor_url,
+            "url": self.ap_uri,
+            "fedletic:workout_type": self.workout_type,
         }
 
         if self.summary:
@@ -280,16 +286,7 @@ class ActivityPubMixin(models.Model):
         workout_object.update(workout_attributes)
 
         # Create the full ActivityPub activity
-        return {
-            "@context": [
-                "https://www.w3.org/ns/activitystreams",
-                {"fedletic": "https://fedletic.com/ns#"},
-            ],
-            "id": f"{self.ap_id}/activity",
-            "type": "Create",
-            "actor": self.actor.actor_url,
-            "object": workout_object,
-        }
+        return workout_object
 
     def _get_serializable_attributes(self) -> Dict[str, Any]:
         """Extract serializable attributes from the workout model."""

@@ -1,5 +1,7 @@
 import logging
 
+import httpx
+
 from activitypub.events import events
 from activitypub.models import Activity
 from feeds.methods import distribute_to_feed
@@ -46,8 +48,10 @@ def process_workout(activity_id):
         return
 
     log.info("Creating incoming workout=%s", activity.object_json)
-
+    activity_object = httpx.get(
+        activity.object_json["content"], headers={"accept": "application/activity+json"}
+    )
     workout = Workout.create_from_activitypub_object(
-        ap_object=activity.object_json, actor=activity.actor
+        ap_object=activity_object.json(), actor=activity.actor
     )
     distribute_to_feed(source=workout.actor, content_object=workout)

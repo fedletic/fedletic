@@ -94,7 +94,7 @@ class LandingView(View):
 class FedleticView(View):
     REQUIRES_AUTH = False
 
-    def get_ap(self, request, *args, **kwargs):
+    def get_ap(self, request, **kwargs):
         raise NotImplementedError
 
     def dispatch(self, request: HttpRequest, *args, **kwargs):
@@ -118,7 +118,7 @@ class FedleticView(View):
             "application/activity+json" in accept_header
             or "application/ld+json" in accept_header
         ):
-            response = self.get_ap(request, *args, **kwargs)
+            response = self.get_ap(request, **kwargs)
             response.headers["Content-Type"] = "application/activity+json"
             return response
 
@@ -280,16 +280,12 @@ class CreateWorkoutView(FedleticView):
 
 
 class WorkoutView(FedleticView):
+    def get_ap(self, request, workout_id, **kwargs):
+        workout = Workout.objects.get(ap_id=workout_id, actor=request.actor)
+        return JsonResponse(workout.as_activitypub_object())
 
-    def get_ap(self, request, *args, **kwargs):
-        pass
-
-    def get(self, request, webfinger, workout_id, **kwargs):
-
-        if "@" not in webfinger:
-            webfinger = f"{webfinger}@{settings.SITE_URL}"
-
-        workout = Workout.objects.get(ap_id=workout_id, actor__webfinger=webfinger)
+    def get(self, request, workout_id, **kwargs):
+        workout = Workout.objects.get(ap_id=workout_id, actor=request.actor)
 
         return render(
             request,
@@ -299,11 +295,9 @@ class WorkoutView(FedleticView):
 
 
 class WorkoutNoteView(FedleticView):
-    def get_ap(self, request, webfinger, workout_id, *args, **kwargs):
-        if "@" not in webfinger:
-            webfinger = f"{webfinger}@{settings.SITE_URL}"
+    def get_ap(self, request, workout_id, **kwargs):
         try:
-            workout = Workout.objects.get(ap_id=workout_id, actor__webfinger=webfinger)
+            workout = Workout.objects.get(ap_id=workout_id, actor=request.actor)
         except Workout.DoesNotExist:
             return JsonResponse(
                 {"error": "not found"}, status=status.HTTP_404_NOT_FOUND
