@@ -6,11 +6,10 @@ from activitypub.views.following import FollowingListView
 from activitypub.views.inbox import InboxView
 from activitypub.views.nodeinfo import NodeInfoView
 from activitypub.views.outbox import OutboxView
-from activitypub.views.shared_inbox import SharedInboxView
 from activitypub.views.well_known import WellKnownNodeInfoView, WellKnownWebFingerView
 
 urlpatterns = [
-    path("inbox/", SharedInboxView.as_view(), name="shared-inbox"),
+    path("inbox/", InboxView.as_view(), name="shared-inbox"),
     path("nodeinfo/2.0", NodeInfoView.as_view(), name="nodeinfo"),
     path("users/<str:username>", ActorView.as_view(), name="actor"),
     path("users/<str:username>/inbox/", InboxView.as_view(), name="inbox"),

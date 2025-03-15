@@ -1,9 +1,12 @@
 import logging
-from urllib.parse import urlencode
+import os
+from urllib.parse import urlencode, urlparse
 
+import bleach
 import httpx
 from django.conf import settings
 from django.core.cache import cache
+from django.core.files.base import ContentFile
 
 import activitypub.crypto as ap_crypto
 from activitypub.exceptions import UsernameExists
@@ -13,6 +16,19 @@ from activitypub.tasks.publish_activity import publish_activity
 from activitypub.utils import get_actor_urls, webfinger_from_url
 
 log = logging.getLogger(__name__)
+
+
+def sanitize_html(html_content):
+    if html_content is None:
+        return ""
+
+    sanitized_html = bleach.clean(
+        html_content,
+        tags=["p", "br", "strong", "em"],
+        attributes={"a": ["href", "rel"]},
+        strip=True,
+    )
+    return sanitized_html
 
 
 def create_actor(username):
@@ -71,6 +87,44 @@ def webfinger_lookup(user_id):
     return response.json()
 
 
+def download_image_to_model(model, field_name, url):
+    """
+    Downloads an image from a URL and saves it to the specified model field.
+
+    Args:
+        model: Django model instance
+        field_name: Name of the ImageField/FileField
+        url: URL of the image to download
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Get the image content
+        with httpx.Client() as client:
+            response = client.get(url)
+            response.raise_for_status()
+
+        # Extract filename from URL
+        parsed_url = urlparse(url)
+        filename = os.path.basename(parsed_url.path)
+
+        # If filename is empty or invalid, create a default one
+        if not filename or "." not in filename:
+            content_type = response.headers.get("Content-Type", "")
+            ext = content_type.split("/")[-1]
+            filename = f"image.{ext}"
+
+        # Save to model field
+        field = getattr(model, field_name)
+        field.save(filename, ContentFile(response.content), save=True)
+
+        return True
+    except Exception as e:
+        print(f"Error downloading image: {e}")
+        return False
+
+
 def fetch_remote_actor(actor_url):
     """
     Fetch and cache a remote actor from its URL
@@ -105,13 +159,17 @@ def fetch_remote_actor(actor_url):
         if not public_key:
             log.warning(f"No public key found for {actor_url}")
             return None
+        log.debug("Creating actor=%s", actor_data)
 
         shared_inbox = actor_data.get("endpoints", {}).get("sharedInbox")
+        summary = sanitize_html(actor_data.get("summary", ""))
 
         # Create or update actor in local database
         actor, created = Actor.objects.update_or_create(
             profile_url=actor_url,
             defaults={
+                "name": actor_data.get("name"),
+                "summary": summary,
                 "webfinger": username,
                 "public_key": public_key,
                 "is_remote": True,
@@ -124,6 +182,17 @@ def fetch_remote_actor(actor_url):
                 "profile_url": actor_data.get("url"),
             },
         )
+
+        if icon := actor_data.get("icon"):
+            media_type = icon["mediaType"]
+            if "image" in media_type:
+                download_image_to_model(actor, "icon", icon["url"])
+
+        # Mastodon calls header "image".
+        if image := actor_data.get("image"):
+            media_type = image["mediaType"]
+            if "image" in media_type:
+                download_image_to_model(actor, "header", image["url"])
 
         # Cache the actor for future requests
         cache.set(cache_key, actor, timeout=3600)  # Cache for 1 hour

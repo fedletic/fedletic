@@ -1,6 +1,5 @@
 {% extends "frontend/base.html" %}
 {% load static %}
-
 {% block title %}Fedletic Feed{% endblock %}
 
 {% block content %}
@@ -15,7 +14,7 @@
             <div class="bg-gray-900 mb-4">
                 <!-- Cover Photo -->
                 <div class="h-48 bg-gray-800 relative rounded-md">
-                    <img src="https://placehold.co/1200x300" alt="Cover photo"
+                    <img src="{{ actor.header_uri }}" alt="Cover photo"
                          class="w-full h-full object-cover rounded-md">
                 </div>
 
@@ -24,25 +23,45 @@
                     <!-- Avatar (overlapping position) -->
                     <div class="absolute -top-16 left-4">
                         <img class="w-32 h-32 rounded-md border-4 border-gray-900 bg-gray-700"
-                             src="https://placehold.co/64" alt="Profile avatar">
+                             src="{{ actor.icon_uri }}" alt="Profile avatar">
                     </div>
-
                     <!-- Actions -->
-                    <div class="flex justify-end pt-3 pb-4">
-                        <button class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md text-sm border border-gray-700 flex items-center">
-                            <span>Edit profile</span>
-                        </button>
-                    </div>
-
+                    {% if request.user.actor == actor %}
+                        <div class="flex justify-end pt-3 pb-4">
+                            <button class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md text-sm border border-gray-700 flex items-center">
+                                <span>Edit profile</span>
+                            </button>
+                        </div>
+                    {% else %}
+                        {% if not following %}
+                            <div class="flex justify-end pt-3 pb-4">
+                                <form method="post" enctype="multipart/form-data">
+                                    {% csrf_token %}
+                                    <button name="action" value="follow" type="submit"
+                                            class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md text-sm border border-gray-700 flex items-center">
+                                        <span>Follow</span>
+                                    </button>
+                                </form>
+                            </div>
+                        {% else %}
+                            <div class="flex justify-end pt-3 pb-4">
+                                <form method="post" enctype="multipart/form-data">
+                                    {% csrf_token %}
+                                    <button name="action" value="unfollow" type="submit"
+                                            class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md text-sm border border-gray-700 flex items-center">
+                                        <span>Unfollow</span>
+                                    </button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    {% endif %}
                     <!-- Profile Info -->
                     <div class="pt-4">
                         <h1 class="text-xl font-bold text-white capitalize">{{ actor.name }}</h1>
                         <div class="text-gray-400">@{{ actor.webfinger }}</div>
 
-                        {% if actor.description %}
-                            <div class="mt-3 text-gray-200">
-                                {{ actor.description }}
-                            </div>
+                        {% if actor.summary %}
+                            <div class="mt-3 text-gray-200">{{ actor.summary|safe }}</div>
                         {% endif %}
 
                         <!-- Stats -->
@@ -72,10 +91,6 @@
                     <a href="#"
                        class="px-4 py-4 text-center text-sm font-medium text-gray-500 hover:text-gray-300 hover:bg-gray-800">
                         Media
-                    </a>
-                    <a href="#"
-                       class="px-4 py-4 text-center text-sm font-medium text-gray-500 hover:text-gray-300 hover:bg-gray-800">
-                        About
                     </a>
                 </div>
             </div>

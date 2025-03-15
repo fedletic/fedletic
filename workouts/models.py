@@ -1,5 +1,6 @@
 import dataclasses
 import datetime
+import pprint
 from typing import Any, Dict, List
 
 from django.db import models
@@ -30,7 +31,7 @@ class BaseWorkoutMixin(models.Model):
         max_length=32, default=WORKOUT_STATUS_PENDING, choices=WORKOUT_STATUSES_CHOICES
     )
     fit_file = models.FileField(upload_to="fit-files", null=True, blank=True)
-
+    created_on = models.DateTimeField(auto_now_add=True)
     # Time-related fields
     start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
@@ -133,9 +134,11 @@ class ActivityPubMixin(models.Model):
         null=True,
         blank=True,
     )
+    # A workout can have multiple activities, e.g for create, update, undo, et cetera.
     workout_activities = models.ManyToManyField(
         "activitypub.Activity", related_name="workout_activities"
     )
+    # Same goes for the note.
     note_activities = models.ManyToManyField(
         "activitypub.Activity", related_name="note_activities"
     )
@@ -284,7 +287,7 @@ class ActivityPubMixin(models.Model):
             ],
             "id": f"{self.ap_id}/activity",
             "type": "Create",
-            "actor": self.actor.ap_id,
+            "actor": self.actor.actor_url,
             "object": workout_object,
         }
 
@@ -305,6 +308,8 @@ class ActivityPubMixin(models.Model):
             "local_uri",
             "workout_activities",
             "note_activities",
+            "images",  # TODO: handle this.
+            "comments",  # TODO: handle this.
         ]
 
         serialized = {}
@@ -333,6 +338,7 @@ class ActivityPubMixin(models.Model):
             except AttributeError:
                 continue
 
+        pprint.pprint(serialized)
         return serialized
 
 
@@ -515,3 +521,36 @@ class Workout(
             )
 
         return attrs
+
+
+class Comment(models.Model):
+    """
+    TODO: Load comments from inbox.
+    """
+
+    ap_id = models.CharField(max_length=255, default=generate_ulid)
+    ap_uri = models.URLField(max_length=1024, null=True, blank=True)
+    local_uri = models.URLField(max_length=1024, null=True, blank=True)
+    actor = models.ForeignKey(
+        "activitypub.Actor",
+        related_name="comments",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    content = models.TextField()
+    workout = models.ForeignKey(
+        "workouts.Workout", related_name="comments", on_delete=models.CASCADE
+    )
+
+
+class ImageAttachment(models.Model):
+    id = models.CharField(primary_key=True, default=generate_ulid, editable=False)
+    workout = models.ForeignKey(
+        "workouts.Workout", related_name="images", on_delete=models.CASCADE
+    )
+    image = models.ImageField(upload_to="workout-images")
+    blurhash = models.TextField()
+    image_dimensions = models.JSONField()
+    file_size = models.IntegerField()
+    file_name = models.CharField()

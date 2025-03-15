@@ -4,6 +4,7 @@ from django.db.transaction import atomic
 from django.http import HttpRequest, HttpResponseNotFound, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render, reverse
 from django.views import View
+from rest_framework import status
 
 from activitypub.methods import (
     create_actor,
@@ -74,6 +75,10 @@ class LandingView(View):
         return redirect(to=reverse("frontend-feed"))
 
     def get(self, request, login_form=None, register_form=None):
+
+        if request.user.is_authenticated:
+            return redirect(to=reverse("frontend-feed"))
+
         if not register_form:
             register_form = RegisterForm()
         if not login_form:
@@ -231,7 +236,11 @@ class LogoutView(FedleticView):
 
 class FeedView(FedleticView):
     def get(self, request):
-        feed_items = FeedItem.objects.filter(target=request.user.actor)
+        if request.user.is_authenticated:
+            feed_items = FeedItem.objects.filter(target=request.user.actor)
+        else:
+            # TODO: construct public feed.
+            feed_items = []
         return render(request, "frontend/feed.html", {"feed_items": feed_items})
 
 
@@ -293,8 +302,19 @@ class WorkoutNoteView(FedleticView):
     def get_ap(self, request, webfinger, workout_id, *args, **kwargs):
         if "@" not in webfinger:
             webfinger = f"{webfinger}@{settings.SITE_URL}"
-        anchor = Workout.objects.get(ap_id=workout_id, actor__webfinger=webfinger)
-        return JsonResponse(anchor.as_activitypub_object())
+        try:
+            workout = Workout.objects.get(ap_id=workout_id, actor__webfinger=webfinger)
+        except Workout.DoesNotExist:
+            return JsonResponse(
+                {"error": "not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        activity = workout.note_activities.filter(activity_type="Create").first()
+        if not activity:
+            return JsonResponse(
+                {"error": "not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        return JsonResponse(activity.object_json)
 
     def get(self, request, webfinger, workout_id):
         if "@" not in webfinger:

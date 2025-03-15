@@ -75,6 +75,7 @@ def process_activity(activity_id):
     activity = Activity.objects.get(pk=activity_id)
 
     log.info("Processing activity=%s content=%s", activity.id, activity.raw_activity)
+
     if activity.activity_type == "Follow":
         process_follow(activity)
 

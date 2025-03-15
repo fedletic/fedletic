@@ -9,8 +9,28 @@ log = logging.getLogger(__name__)
 
 
 @events.on("activity")
+def process_comment(activity_id):
+    activity = Activity.objects.get(pk=activity_id)
+    log.info("Incoming activity id=%s type=%s", activity_id, activity.activity_type)
+
+    if not activity.activity_type == "Create":
+        # TODO: support update etcetera.
+        return
+
+    if not activity.object_json:
+        # Not going to do anything with this, as we expect an object to be inside of the Create.
+        # TODO: support URIs
+        return
+
+    if not activity.object_json["type"] == "Workout":
+        # Not a workout, so not applicable here.
+        return
+
+
+@events.on("activity")
 def process_workout(activity_id):
     activity = Activity.objects.get(pk=activity_id)
+    log.info("Incoming activity id=%s type=%s", activity_id, activity.activity_type)
 
     if not activity.activity_type == "Create":
         # TODO: support update etcetera.
