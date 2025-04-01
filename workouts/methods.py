@@ -6,7 +6,7 @@ from django.db.transaction import atomic
 from django.urls import reverse
 from garmin_fit_sdk import Decoder, Stream
 
-from workouts.consts import WORKOUT_TYPES_LIST
+from workouts.consts import WORKOUT_TYPES_CHOICES, WORKOUT_TYPES_LIST
 from workouts.exceptions import FitFileException
 from workouts.models import Workout
 
@@ -103,32 +103,114 @@ def generate_cycling_workout_description(workout):
     return description
 
 
-def update_cycling_workout(workout, workout_data, session):
-    # Naming convention based on date and time
+def validate_fit_file(fit_file):
+    stream = Stream.from_byte_array(fit_file.read())
+    decoder = Decoder(stream)
+
+    if not decoder.is_fit():
+        raise FitFileException(code="invalid_file", message="Invalid fit file")
+
+    messages, errors = decoder.read()
+
+    if errors:
+        log.warning(
+            "Encountered %s errors parsing a fit file. errors=%s", len(errors), errors
+        )
+
+    # Extract data from session messages
+    if "session_mesgs" not in messages:
+        raise FitFileException(code="no_sessions", message="Fit file has no sessions")
+
+    session_messages = messages["session_mesgs"]
+
+    if len(session_messages) != 1:
+        raise FitFileException(
+            code="session_count_mismatch",
+            message=f"Fit file expects 1 session message, found {len(session_messages)}",
+        )
+
+    session = session_messages[0]
+
+    if "sport" not in session:
+        raise FitFileException(
+            code="no_sport", message="Session does not contain a sport"
+        )
+
+    fit_file.seek(0)
+    return messages
+
+
+@atomic
+def create_workout(actor, fit_file, name=None, summary=None):
+
+    messages = validate_fit_file(fit_file)
+    session = messages["session_mesgs"][0]
+    workout_type = session["sport"]
+    workout_type_as_display = "Workout"
+
     start_time = session.get("start_time")
-    if start_time:
-        date_str = start_time.strftime("%Y-%m-%d")
-        workout_data["name"] = f"Cycling - {date_str}"
-        workout_data["start_time"] = start_time
+    if not start_time:
+        start_time = datetime.datetime.now(tz=datetime.UTC)
 
-    # Duration and distance
-    workout_data["duration"] = session.get("total_elapsed_time", 0)
-    workout_data["distance_in_meters"] = session.get("total_distance", 0)
+    if not name:
+        for choice in WORKOUT_TYPES_CHOICES:
+            if workout_type == choice[0]:
+                workout_type_as_display = choice[1]
+                break
 
-    # Timestamps
-    workout_data["end_time"] = session.get("timestamp")
+        name = f"{workout_type_as_display} on {start_time.strftime('%Y-%m-%d')}"
 
-    # Heart rate data
-    workout_data["heart_rate_avg"] = session.get("avg_heart_rate")
-    workout_data["heart_rate_max"] = session.get("max_heart_rate")
-    workout_data["heart_rate_min"] = session.get("min_heart_rate")
+    if workout_type not in WORKOUT_TYPES_LIST:
+        raise ValueError(f"Invalid workout {workout_type}")
 
-    # Calories
-    workout_data["calories_burned"] = session.get("total_calories")
+    workout = Workout.objects.create(
+        actor=actor,
+        name=name,
+        summary=summary,
+        workout_type=workout_type,
+        fit_file=fit_file,
+    )
 
-    # Power data
-    workout_data["power_avg"] = session.get("avg_power")
-    workout_data["power_max"] = session.get("max_power")
+    local_path = reverse(
+        "frontend-workout",
+        kwargs={
+            "webfinger": workout.actor.domainless_webfinger,
+            "workout_id": workout.ap_id,
+        },
+    )
+
+    # TODO: fugly, but it is what it is.
+    workout.ap_uri = f"https://{settings.SITE_URL}{local_path}"
+    workout.local_uri = workout.ap_uri
+    workout.save()
+
+    return workout
+
+
+def process_workout(workout):
+    """
+    Process a workout by validating the fit file and updating workout data.
+    Only creates a summary if one doesn't exist and the sport is cycling.
+    """
+    messages = validate_fit_file(workout.fit_file)
+    session = messages["session_mesgs"][0]
+
+    # Initialize workout data
+    workout_data = {
+        "duration": session.get("total_elapsed_time", 0),
+        "distance_in_meters": session.get("total_distance", 0),
+        "start_time": session.get("start_time"),
+        "end_time": session.get("timestamp"),
+        "heart_rate_avg": session.get("avg_heart_rate"),
+        "heart_rate_max": session.get("max_heart_rate"),
+        "heart_rate_min": session.get("min_heart_rate"),
+        "calories_burned": session.get("total_calories"),
+        "power_avg": session.get("avg_power"),
+        "power_max": session.get("max_power"),
+    }
+
+    if not workout_data["start_time"]:
+        workout_data["start_time"] = datetime.datetime.now(tz=datetime.UTC)
 
     # Time in zones
     if "time_in_hr_zone" in session:
@@ -178,105 +260,13 @@ def update_cycling_workout(workout, workout_data, session):
     workout_data["temperature_max"] = session.get("max_temperature")
     workout_data["temperature_min"] = session.get("min_temperature")
 
+    # Update workout with the new data
     for key, value in workout_data.items():
         setattr(workout, key, value)
 
-    if not workout.summary:
+    # Only generate summary if there is none and sport is cycling
+    if not workout.summary and session.get("sport") == "cycling":
         workout.summary = generate_cycling_workout_description(workout=workout)
 
     workout.save()
-
-
-def validate_fit_file(fit_file):
-    stream = Stream.from_byte_array(fit_file.read())
-    decoder = Decoder(stream)
-
-    if not decoder.is_fit():
-        raise FitFileException(code="invalid_file", message="Invalid fit file")
-
-    messages, errors = decoder.read()
-
-    if errors:
-        log.warning(
-            "Encountered %s errors parsing a fit file. errors=%s", len(errors), errors
-        )
-
-    # Extract data from session messages
-    if "session_mesgs" not in messages:
-        raise FitFileException(code="no_sessions", message="Fit file has no sessions")
-
-    session_messages = messages["session_mesgs"]
-
-    if len(session_messages) != 1:
-        raise FitFileException(
-            code="session_count_mismatch",
-            message=f"Fit file expects 1 session message, found {len(session_messages)}",
-        )
-
-    session = session_messages[0]
-
-    if "sport" not in session:
-        raise FitFileException(
-            code="no_sport", message="Session does not contain a sport"
-        )
-
-    fit_file.seek(0)
-    return messages
-
-
-@atomic
-def create_workout(actor, fit_file, name=None, summary=None):
-
-    messages = validate_fit_file(fit_file)
-    session = messages["session_mesgs"][0]
-    workout_type = session["sport"]
-
-    if not name:
-        name = f"Workout on {datetime.datetime.now().strftime('%Y-%m-%d')}"
-
-    if workout_type not in WORKOUT_TYPES_LIST:
-        raise ValueError(f"Invalid workout {workout_type}")
-
-    workout = Workout.objects.create(
-        actor=actor,
-        name=name,
-        summary=summary,
-        workout_type=workout_type,
-        fit_file=fit_file,
-    )
-
-    local_path = reverse(
-        "frontend-workout",
-        kwargs={
-            "webfinger": workout.actor.domainless_webfinger,
-            "workout_id": workout.ap_id,
-        },
-    )
-
-    # TODO: fugly, but it is what it is.
-    workout.ap_uri = f"https://{settings.SITE_URL}{local_path}"
-    workout.local_uri = workout.ap_uri
-    workout.save()
-
     return workout
-
-
-def process_workout(workout):
-
-    messages = validate_fit_file(workout.fit_file)
-    session = messages["session_mesgs"][0]
-
-    # Initialize variables to store workout data
-    workout_data = {
-        "duration": 0,
-        "distance_in_meters": 0,
-        "start_time": None,
-        "end_time": None,
-    }
-
-    if session["sport"] == "cycling":
-        update_cycling_workout(workout, workout_data, session)
-        workout.save()
-        return
-
-    raise ValueError("Unsupported sport in fit file.")

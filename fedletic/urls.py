@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -6,6 +8,7 @@ from django.urls import include, path
 import apis.v1.urls
 from frontend.views import (
     CreateWorkoutView,
+    EditProfileView,
     FeedView,
     FollowersView,
     FollowingView,
@@ -46,6 +49,7 @@ urlpatterns = [
         name="frontend-workout-note",
     ),
     path("feed", FeedView.as_view(), name="frontend-feed"),
+    path("profile", EditProfileView.as_view(), name="frontend-edit-profile"),
     path("accounts/login", LoginView.as_view(), name="frontend-login"),
     path("accounts/logout", LogoutView.as_view(), name="frontend-logout"),
     path("accounts/register", RegisterView.as_view(), name="frontend-register"),
@@ -55,5 +59,5 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
-    print(settings.MEDIA_URL)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    media_path = urlparse(settings.MEDIA_URL).path
+    urlpatterns += static(media_path, document_root=settings.MEDIA_ROOT)

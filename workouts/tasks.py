@@ -34,13 +34,13 @@ def process_workout(workout_id):
             "type": "Note",
             "content": workout.summary,
             "attributedTo": workout.actor.profile_url,
-            "published": workout.start_time.isoformat(),
+            "published": workout.created_on.isoformat(),
             "to": ["https://www.w3.org/ns/activitystreams#Public"],
             "cc": [workout.actor.followers_url],
         },
         to=["https://www.w3.org/ns/activitystreams#Public"],
         cc=[workout.actor.followers_url],
-        published=workout.start_time.isoformat(),
+        published=workout.created_on.isoformat(),
     )
 
     # Save for the future, I guess.

@@ -13,7 +13,11 @@ log = logging.getLogger(__name__)
 @events.on("activity")
 def process_comment(activity_id):
     activity = Activity.objects.get(pk=activity_id)
-    log.info("Incoming activity id=%s type=%s", activity_id, activity.activity_type)
+    log.debug(
+        "Incoming activity on process_comment id=%s type=%s",
+        activity_id,
+        activity.activity_type,
+    )
 
     if not activity.activity_type == "Create":
         # TODO: support update etcetera.
@@ -32,7 +36,11 @@ def process_comment(activity_id):
 @events.on("activity")
 def process_workout(activity_id):
     activity = Activity.objects.get(pk=activity_id)
-    log.info("Incoming activity id=%s type=%s", activity_id, activity.activity_type)
+    log.debug(
+        "Incoming activity on process_workout id=%s type=%s",
+        activity_id,
+        activity.activity_type,
+    )
 
     if not activity.activity_type == "Create":
         # TODO: support update etcetera.
@@ -54,4 +62,5 @@ def process_workout(activity_id):
     workout = Workout.create_from_activitypub_object(
         ap_object=activity_object.json(), actor=activity.actor
     )
+    log.debug("Created new workout")
     distribute_to_feed(source=workout.actor, content_object=workout)

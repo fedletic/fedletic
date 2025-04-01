@@ -7,7 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from activitypub.crypto import verify_http_signature
 
-log = logging.getLogger()
+log = logging.getLogger(__name__)
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -15,6 +15,12 @@ class ActivityPubBaseView(View):
     CONTENT_TYPE = "application/activity+json"
 
     def dispatch(self, request, *args, **kwargs):
+
+        log.debug(
+            "Incoming ActivityPub request method=%s path=%s",
+            request.method,
+            request.path,
+        )
 
         if request.method in ["POST", "DELETE", "PUT", "PATCH"]:
             is_valid, message = verify_http_signature(request)

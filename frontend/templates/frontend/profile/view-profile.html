@@ -1,6 +1,6 @@
 {% extends "frontend/base.html" %}
 {% load static %}
-{% block title %}Fedletic Feed{% endblock %}
+{% block title %}Fedletic | {{ actor.domainless_webfinger }}{% endblock %}
 
 {% block content %}
     <!-- Main Content -->
@@ -21,16 +21,18 @@
                 <!-- Profile Section -->
                 <div class="px-4 sm:px-6 relative">
                     <!-- Avatar (overlapping position) -->
+
                     <div class="absolute -top-16 left-4">
                         <img class="w-32 h-32 rounded-md border-4 border-gray-900 bg-gray-700"
                              src="{{ actor.icon_uri }}" alt="Profile avatar">
                     </div>
                     <!-- Actions -->
-                    {% if request.user.actor == actor %}
+                    {% if is_actor %}
                         <div class="flex justify-end pt-3 pb-4">
-                            <button class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md text-sm border border-gray-700 flex items-center">
+                            <a href="{% url "frontend-edit-profile" %}"
+                               class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md text-sm border border-gray-700 flex items-center">
                                 <span>Edit profile</span>
-                            </button>
+                            </a>
                         </div>
                     {% else %}
                         {% if not following %}

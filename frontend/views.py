@@ -16,7 +16,7 @@ from activitypub.methods import (
 from activitypub.models import Actor
 from fedletic.models import FedleticUser
 from feeds.models import FeedItem
-from frontend.forms import LoginForm, RegisterForm
+from frontend.forms import LoginForm, ProfileEditForm, RegisterForm
 from workouts.forms import CreateWorkoutForm
 from workouts.methods import create_workout
 from workouts.models import Workout
@@ -170,6 +170,26 @@ class RegisterView(View):
         return render(request, "frontend/accounts/register.html", {"form": form})
 
 
+class EditProfileView(View):
+
+    def post(self, request):
+        form = ProfileEditForm(request.POST, request.FILES)
+        if form.is_valid():
+            updated_actor = form.save(request.user.actor)
+            updated_actor.save()  # Now this save will store the images
+            return self.get(request)
+        return self.get(request, form=form)
+
+    def get(self, request, form=None):
+        actor = request.user.actor
+        # TODO add errors in the frontend.
+        return render(
+            request,
+            "frontend/profile/edit-profile.html",
+            {"actor": actor, "form": form},
+        )
+
+
 class ProfileView(View):
 
     def post(self, request, webfinger):
@@ -218,13 +238,16 @@ class ProfileView(View):
             )
 
         following = False
+        is_actor = False
+
         if request.user.is_authenticated:
             following = request.user.actor.following.filter(target=actor).exists()
+            is_actor = actor == request.user.actor
 
         return render(
             request,
-            "frontend/profile/profile.html",
-            {"actor": actor, "following": following},
+            "frontend/profile/view-profile.html",
+            {"actor": actor, "is_actor": is_actor, "following": following},
         )
 
 

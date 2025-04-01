@@ -8,6 +8,7 @@ from django.urls import reverse
 
 from activitypub.utils import generate_ulid
 from workouts.consts import (
+    WORKOUT_ALPINE_SKIING,
     WORKOUT_CYCLING,
     WORKOUT_RUNNING,
     WORKOUT_STATUS_PENDING,
@@ -32,7 +33,6 @@ class BaseWorkoutMixin(models.Model):
     )
     fit_file = models.FileField(upload_to="fit-files", null=True, blank=True)
     created_on = models.DateTimeField(auto_now_add=True)
-    # Time-related fields
     start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
     duration = models.PositiveIntegerField(
@@ -58,6 +58,33 @@ class BaseWorkoutMixin(models.Model):
         time_parts.append(f"{seconds}s")
 
         return "".join(time_parts)
+
+
+class ElevationMixin(models.Model):
+    """Fields for workouts that involve elevation changes."""
+
+    elevation_gain = models.FloatField(null=True, blank=True)
+    elevation_loss = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        abstract = True
+
+    @property
+    def elevation_gain_display(self):
+        gain = self.elevation_gain if self.elevation_gain is not None else 0
+        return self._format_elevation(gain)
+
+    @property
+    def elevation_loss_display(self):
+        loss = self.elevation_loss if self.elevation_loss is not None else 0
+        return self._format_elevation(loss)
+
+    def _format_elevation(self, elevation):
+        """Format elevation values consistently."""
+        if elevation >= 1000:
+            return f"{elevation / 1000:.1f} km"
+        else:
+            return f"{int(elevation)} m"
 
 
 class DistanceMixin(models.Model):
@@ -105,6 +132,42 @@ class PhysiologicalMetricsMixin(models.Model):
     def calories_burned_display(self):
         calories_burned = self.calories_burned if self.calories_burned else 0
         return f"{calories_burned} kcal"
+
+    @property
+    def time_in_hr_zones_display(self):
+        """
+        Format time spent in each heart rate zone.
+
+        Returns formatted time for each zone:
+        - Zone 1: 50-60% of max HR (Recovery)
+        - Zone 2: 60-70% of max HR (Endurance)
+        - Zone 3: 70-80% of max HR (Stamina)
+        - Zone 4: 80-90% of max HR (Economy)
+        - Zone 5: 90-100% of max HR (Speed)
+        """
+        if not self.time_in_hr_zones:
+            return "No data"
+
+        # Format each zone's time in minutes and seconds
+        formatted_zones = []
+        zone_names = ["Recovery", "Endurance", "Stamina", "Economy", "Speed"]
+
+        for i, seconds in enumerate(self.time_in_hr_zones):
+            if i >= len(zone_names):
+                break
+
+            minutes = int(seconds // 60)
+            remaining_seconds = int(seconds % 60)
+
+            if minutes > 0:
+                time_str = f"{minutes}m {remaining_seconds}s"
+            else:
+                time_str = f"{remaining_seconds}s"
+
+            # Format as zone name and time
+            formatted_zones.append(f"Zone {i + 1} ({zone_names[i]}): {time_str}")
+
+        return ", ".join(formatted_zones)
 
 
 class EnvironmentalMetricsMixin(models.Model):
@@ -363,8 +426,6 @@ class RunWorkoutMixin(models.Model):
     ground_contact_time_avg = models.IntegerField(
         help_text="Average ground contact time in ms", null=True, blank=True
     )
-    elevation_gain = models.FloatField(null=True, blank=True)
-    elevation_loss = models.FloatField(null=True, blank=True)
 
     class Meta:
         abstract = True
@@ -470,6 +531,7 @@ class CyclingWorkoutMixin(models.Model):
 class Workout(
     BaseWorkoutMixin,
     DistanceMixin,
+    ElevationMixin,
     PhysiologicalMetricsMixin,
     EnvironmentalMetricsMixin,
     ActivityPubMixin,
@@ -501,15 +563,17 @@ class Workout(
                 label="Duration",
                 value=self.duration_display,
             ),
+            QuickViewAttribute(
+                label="Calories",
+                value=self.calories_burned_display,
+            ),
         ]
         # Add type-specific attributes
-        if self.workout_type in [WORKOUT_RUNNING, WORKOUT_CYCLING]:
-            attrs.append(
-                QuickViewAttribute(
-                    label="Calories",
-                    value=self.calories_burned_display,
-                )
-            )
+        if self.workout_type in [
+            WORKOUT_RUNNING,
+            WORKOUT_CYCLING,
+            WORKOUT_ALPINE_SKIING,
+        ]:
             attrs.append(
                 QuickViewAttribute(
                     label="Distance",
@@ -518,6 +582,155 @@ class Workout(
             )
 
         return attrs
+
+    @property
+    def workout_attributes(self):
+        """
+        Return all relevant workout attributes in a structured format.
+
+        Returns:
+            List[Dict]: A list of dictionaries with keys:
+                - key: Field name
+                - label: Human-readable label
+                - value: Raw value
+                - display_value: Formatted value for display
+        """
+        attributes = []
+
+        # Map of field names to human-readable labels
+        field_labels = {
+            # Base workout fields
+            "duration": "Duration",
+            # Distance fields"
+            "distance_in_meters": "Distance",
+            # Physiological metrics
+            "calories_burned": "Calories Burned",
+            "heart_rate_min": "Min Heart Rate",
+            "heart_rate_avg": "Average Heart Rate",
+            "heart_rate_max": "Max Heart Rate",
+            "training_effect_aerobic": "Aerobic Training Effect",
+            "training_effect_anaerobic": "Anaerobic Training Effect",
+            "vo2_max": "VO2 Max",
+            # Environmental metrics
+            "altitude_min": "Min Altitude",
+            "altitude_max": "Max Altitude",
+            "altitude_avg": "Average Altitude",
+            "temperature_min": "Min Temperature",
+            "temperature_max": "Max Temperature",
+            "temperature_avg": "Average Temperature",
+            # Running fields
+            "pace_avg": "Average Pace",
+            "pace_best": "Best Pace",
+            "cadence_avg": "Average Cadence",
+            "cadence_max": "Maximum Cadence",
+            "stride_length_avg": "Average Stride Length",
+            "vertical_oscillation_avg": "Average Vertical Oscillation",
+            "ground_contact_time_avg": "Average Ground Contact Time",
+            "elevation_gain": "Elevation Gain",
+            "elevation_loss": "Elevation Loss",
+            # Swimming fields
+            "pool_length": "Pool Length",
+            "is_open_water": "Open Water",
+            "stroke_count": "Stroke Count",
+            "strokes_per_length_avg": "Average Strokes per Length",
+            "swolf_avg": "Average SWOLF",
+            "swolf_best": "Best SWOLF",
+            "freestyle_time": "Freestyle Time",
+            "backstroke_time": "Backstroke Time",
+            "breaststroke_time": "Breaststroke Time",
+            "butterfly_time": "Butterfly Time",
+            "drill_time": "Drill Time",
+            "mixed_time": "Mixed Time",
+            "rest_time": "Rest Time",
+            "stroke_rate_avg": "Average Stroke Rate",
+            # Cycling fields
+            "speed_avg": "Average Speed",
+            "speed_max": "Max Speed",
+            "power_avg": "Average Power",
+            "power_max": "Max Power",
+            "grade_avg": "Average Grade",
+            "grade_max": "Maximum Grade",
+            "grade_min": "Minimum Grade",
+        }
+
+        # Fields with custom display properties
+        display_properties = {
+            "duration": "duration_display",
+            "distance_in_meters": "distance_in_meters_display",
+            "calories_burned": "calories_burned_display",
+            "pace_avg": "pace_display",
+            "speed_avg": "speed_display",
+            "elevation_gain": "elevation_gain_display",
+            "elevation_loss": "elevation_loss_display",
+            "time_in_hr_zones": "time_in_hr_zones_display",
+            "workout_type": "get_workout_type_display",
+        }
+
+        # Get all fields from the model
+        for field in self._meta.get_fields():
+            # Skip many-to-many relationships, foreign keys, and some internal fields
+            if field.name.startswith("_") or field.name in [
+                "workout_activities",
+                "note_activities",
+                "images",
+                "comments",
+                "actor",
+                "ap_id",
+                "ap_uri",
+                "local_uri",
+                "fit_file",
+                "id",
+                "status",
+                "name",
+                "summary",
+                "created_on",
+                "updated_on",
+            ]:
+                continue
+
+            # Skip if it's a relationship field
+            if field.is_relation:
+                continue
+
+            # Get the raw value
+            value = getattr(self, field.name, None)
+
+            # Skip if the value is None
+            if value is None:
+                continue
+
+            # Get the display value
+            display_value = None
+            if field.name in display_properties:
+                display_property = display_properties[field.name]
+                display_value = getattr(self, display_property, str(value))
+            else:
+                # Format datetime fields
+                if isinstance(value, datetime.datetime):
+                    display_value = value.strftime("%Y-%m-%d %H:%M:%S")
+                # Format boolean fields
+                elif isinstance(value, bool):
+                    display_value = "Yes" if value else "No"
+                # Format float fields
+                elif isinstance(value, float):
+                    display_value = f"{value:.2f}"
+                else:
+                    display_value = str(value)
+
+            # Get the label
+            label = field_labels.get(field.name, field.name.replace("_", " ").title())
+
+            attributes.append(
+                {
+                    "key": field.name,
+                    "label": label,
+                    "value": value,
+                    "display_value": display_value,
+                }
+            )
+
+        # Sort by labels
+        return sorted(attributes, key=lambda x: x["label"])
 
 
 class Comment(models.Model):

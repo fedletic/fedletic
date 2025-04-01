@@ -1,0 +1,139 @@
+{% extends "frontend/base.html" %}
+{% load static %}
+{% block title %}Edit Profile - Fedletic{% endblock %}
+
+{% block content %}
+    <!-- Main Content -->
+    <div class="flex">
+        <!-- Left Sidebar -->
+        {% include "frontend/partials/sidebar.html" %}
+
+        <!-- Middle Content -->
+        <div class="flex-1 max-w-screen-md mx-auto px-4 py-4">
+            <!-- Form Container -->
+            <div class="bg-gray-900 rounded-md mb-4">
+                <div class="px-6 py-4 border-b border-gray-800">
+                    <h1 class="text-xl font-bold text-white">Edit Profile</h1>
+                </div>
+
+                <form method="post" enctype="multipart/form-data" class="p-6">
+                    {% csrf_token %}
+
+                    <!-- Header Image Preview -->
+                    <div class="mb-6">
+                        <label class="block text-gray-300 text-sm font-medium mb-2">Header Image</label>
+                        <div class="h-32 bg-gray-800 relative rounded-md mb-2">
+                            <img id="header-preview" src="{{ actor.header_uri }}" alt="Header image"
+                                 class="w-full h-full object-cover rounded-md">
+                        </div>
+                        <div class="flex items-center">
+                            <input type="file" name="header_image" id="header_image" accept="image/*"
+                                   class="hidden" onchange="previewHeader(this)">
+                            <label for="header_image"
+                                   class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md text-sm border border-gray-700 cursor-pointer">
+                                Choose new header
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Avatar Preview -->
+                    <div class="mb-6">
+                        <label class="block text-gray-300 text-sm font-medium mb-2">Profile Picture</label>
+                        <div class="flex items-center">
+                            <div class="mr-4">
+                                <img id="avatar-preview" src="{{ actor.icon_uri }}" alt="Profile avatar"
+                                     class="w-24 h-24 rounded-md border-2 border-gray-700 bg-gray-800 object-cover">
+                            </div>
+                            <div>
+                                <input type="file" name="avatar" id="avatar" accept="image/*"
+                                       class="hidden" onchange="previewAvatar(this)">
+                                <label for="avatar"
+                                       class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md text-sm border border-gray-700 cursor-pointer block mb-2">
+                                    Choose new avatar
+                                </label>
+                                <span class="text-gray-400 text-xs">Recommended: Square image, at least 400x400px</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Display Name -->
+                    <div class="mb-6">
+                        <label for="display_name" class="block text-gray-300 text-sm font-medium mb-2">Display
+                            Name</label>
+                        <input type="text" name="display_name" id="display_name" value="{{ actor.name }}"
+                               class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                    </div>
+
+                    <!-- Username (read-only) -->
+                    <div class="mb-6">
+                        <label for="username" class="block text-gray-300 text-sm font-medium mb-2">Username</label>
+                        <input type="text" id="username" value="@{{ actor.webfinger }}" disabled
+                               class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-gray-500 cursor-not-allowed">
+                        <p class="mt-1 text-sm text-gray-400">Username cannot be changed</p>
+                    </div>
+
+                    <!-- Bio / Summary -->
+                    <div class="mb-6">
+                        <label for="summary" class="block text-gray-300 text-sm font-medium mb-2">Bio</label>
+                        <textarea name="summary" id="summary" rows="4"
+                                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">{{ actor.summary|striptags }}</textarea>
+                        <p class="mt-1 text-sm text-gray-400">Brief description about yourself (max 500 characters)</p>
+                    </div>
+
+                    <!-- Privacy Settings (optional section) -->
+                    <!-- todo
+                    <div class="mb-6">
+                        <h2 class="text-gray-300 text-lg font-medium mb-3">Privacy Settings</h2>
+                        <div class="space-y-3">
+                            <label class="flex items-center">
+                                <input type="checkbox" name="private_profile"
+                                       class="form-checkbox h-4 w-4 text-indigo-500 bg-gray-800 border-gray-700 rounded">
+                                <span class="ml-2 text-gray-300">Private profile (only followers can see your workouts)</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" name="approve_followers"
+                                       class="form-checkbox h-4 w-4 text-indigo-500 bg-gray-800 border-gray-700 rounded">
+                                <span class="ml-2 text-gray-300">Approve new followers</span>
+                            </label>
+                        </div>
+                    </div>
+                    -- >
+
+                    <!-- Action Buttons -->
+                    <div class="flex justify-end space-x-3">
+                        <a href="{% url 'frontend-profile' actor.webfinger %}"
+                           class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-md text-sm border border-gray-700">
+                            Cancel
+                        </a>
+                        <button type="submit" name="action" value="update_profile"
+                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm">
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function previewHeader(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    document.getElementById('header-preview').src = e.target.result;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function previewAvatar(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    document.getElementById('avatar-preview').src = e.target.result;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
+{% endblock %}

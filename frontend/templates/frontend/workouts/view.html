@@ -10,11 +10,11 @@
                 <!-- Header with user info -->
                 <div class="p-4 flex items-center justify-between">
                     <div class="flex items-center">
-                        <img class="h-10 w-10 rounded-full bg-gray-300 object-cover" src="https://placehold.co/64"
+                        <img class="h-10 w-10 rounded bg-gray-300 object-cover" src="{{ workout.actor.icon_uri }}"
                              alt="User avatar">
                         <div class="ml-3">
                             <div class="font-medium text-white capitalize">{{ workout.actor.name }}</div>
-                            <div class="text-xs text-gray-400">March 13, 2025 at 6:15 AM</div>
+                            <div class="text-xs text-gray-400">{{ workout.created_on }}</div>
                         </div>
                     </div>
                     <button class="text-gray-400 hover:text-white">⋯</button>
@@ -22,17 +22,24 @@
 
                 <!-- Workout Title -->
                 <div class="px-4 py-2 bg-gray-700">
-                    <h1 class="text-xl font-bold text-white">{{ workout.name }}</h1>
+                    <div class="flex items-center justify-between">
+                        <h1 class="text-xl font-bold text-white">
+                            {{ workout.name }}
+                        </h1>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-700 text-indigo-100">
+                            {{ workout.get_workout_type_display }}
+                        </span>
+                    </div>
                 </div>
 
-                <!-- Map View -->
+                <!-- Map View
                 <div class="bg-gray-900 h-64 relative">
                     <img src="https://placehold.co/600x400" alt="Run map" class="w-full h-full object-cover">
                     <div class="absolute bottom-3 right-3 bg-gray-800 bg-opacity-75 px-2 py-1 rounded text-xs text-white">
                         Route Map
                     </div>
                 </div>
-
+                -->
                 <!-- Workout Summary Stats -->
                 <div class="flex divide-x divide-gray-700 bg-gray-700">
                     {% for attr in workout.quick_view_attrs %}
@@ -44,41 +51,24 @@
                 </div>
 
                 <!-- Workout Description -->
-                <div class="p-4">
-                    <p class="text-gray-200 mb-4">
-                        {{ workout.summary }}
-                    </p>
-                </div>
-
+                {% if workout.summary %}
+                    <div class="p-4">
+                        <p class="text-gray-200 mb-4">
+                            {{ workout.summary }}
+                        </p>
+                    </div>
+                {% endif %}
                 <!-- Detailed Stats Section -->
                 <div class="border-t border-gray-700 px-4 py-3">
                     <h2 class="text-lg font-medium text-white mb-3">Detailed Stats</h2>
 
                     <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div class="bg-gray-700 p-3 rounded-lg">
-                            <div class="text-sm text-gray-400 mb-1">Elevation Gain</div>
-                            <div class="text-lg font-medium text-white">245 m</div>
-                        </div>
-                        <div class="bg-gray-700 p-3 rounded-lg">
-                            <div class="text-sm text-gray-400 mb-1">Calories</div>
-                            <div class="text-lg font-medium text-white">621 kcal</div>
-                        </div>
-                        <div class="bg-gray-700 p-3 rounded-lg">
-                            <div class="text-sm text-gray-400 mb-1">Avg Heart Rate</div>
-                            <div class="text-lg font-medium text-white">158 bpm</div>
-                        </div>
-                        <div class="bg-gray-700 p-3 rounded-lg">
-                            <div class="text-sm text-gray-400 mb-1">Max Heart Rate</div>
-                            <div class="text-lg font-medium text-white">175 bpm</div>
-                        </div>
-                        <div class="bg-gray-700 p-3 rounded-lg">
-                            <div class="text-sm text-gray-400 mb-1">Avg Cadence</div>
-                            <div class="text-lg font-medium text-white">172 spm</div>
-                        </div>
-                        <div class="bg-gray-700 p-3 rounded-lg">
-                            <div class="text-sm text-gray-400 mb-1">Avg Temperature</div>
-                            <div class="text-lg font-medium text-white">12°C</div>
-                        </div>
+                        {% for attribute in workout.workout_attributes %}
+                            <div class="bg-gray-700 p-3 rounded-lg">
+                                <div class="text-sm text-gray-400 mb-1">{{ attribute.label }}</div>
+                                <div class="text-lg font-medium text-white">{{ attribute.display_value }}</div>
+                            </div>
+                        {% endfor %}
                     </div>
 
                     <!-- Charting Example

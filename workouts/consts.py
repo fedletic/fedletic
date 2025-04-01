@@ -10,7 +10,12 @@ WORKOUT_STATUSES_LIST = [
     WORKOUT_STATUS_ERROR,
 ]
 
-WORKOUT_STATUSES_CHOICES = [(s, s) for s in WORKOUT_STATUSES_LIST]
+WORKOUT_STATUSES_CHOICES = [
+    (WORKOUT_STATUS_PENDING, "Pending"),
+    (WORKOUT_STATUS_PROCESSING, "Processing"),
+    (WORKOUT_STATUS_FINISHED, "Finished"),
+    (WORKOUT_STATUS_ERROR, "Error"),
+]
 
 # These are all from Garmin's fit SDK.
 WORKOUT_GENERIC = "generic"
@@ -121,4 +126,56 @@ WORKOUT_TYPES_LIST = [
     WORKOUT_ALL,
 ]
 
-WORKOUT_TYPES_CHOICES = [(w, w) for w in WORKOUT_TYPES_LIST]
+WORKOUT_TYPES_CHOICES = [
+    (WORKOUT_GENERIC, "Generic"),
+    (WORKOUT_RUNNING, "Running"),
+    (WORKOUT_CYCLING, "Cycling"),
+    (WORKOUT_TRANSITION, "Transition"),
+    (WORKOUT_FITNESS_EQUIPMENT, "Fitness Equipment"),
+    (WORKOUT_SWIMMING, "Swimming"),
+    (WORKOUT_BASKETBALL, "Basketball"),
+    (WORKOUT_SOCCER, "Soccer"),
+    (WORKOUT_TENNIS, "Tennis"),
+    (WORKOUT_AMERICAN_FOOTBALL, "American Football"),
+    (WORKOUT_TRAINING, "Training"),
+    (WORKOUT_WALKING, "Walking"),
+    (WORKOUT_CROSS_COUNTRY_SKIING, "Cross Country Skiing"),
+    (WORKOUT_ALPINE_SKIING, "Alpine Skiing"),
+    (WORKOUT_SNOWBOARDING, "Snowboarding"),
+    (WORKOUT_ROWING, "Rowing"),
+    (WORKOUT_MOUNTAINEERING, "Mountaineering"),
+    (WORKOUT_HIKING, "Hiking"),
+    (WORKOUT_MULTISPORT, "Multisport"),
+    (WORKOUT_PADDLING, "Paddling"),
+    (WORKOUT_FLYING, "Flying"),
+    (WORKOUT_E_BIKING, "E-Biking"),
+    (WORKOUT_MOTORCYCLING, "Motorcycling"),
+    (WORKOUT_BOATING, "Boating"),
+    (WORKOUT_DRIVING, "Driving"),
+    (WORKOUT_GOLF, "Golf"),
+    (WORKOUT_HANG_GLIDING, "Hang Gliding"),
+    (WORKOUT_HORSEBACK_RIDING, "Horseback Riding"),
+    (WORKOUT_HUNTING, "Hunting"),
+    (WORKOUT_FISHING, "Fishing"),
+    (WORKOUT_INLINE_SKATING, "Inline Skating"),
+    (WORKOUT_ROCK_CLIMBING, "Rock Climbing"),
+    (WORKOUT_SAILING, "Sailing"),
+    (WORKOUT_ICE_SKATING, "Ice Skating"),
+    (WORKOUT_SKY_DIVING, "Sky Diving"),
+    (WORKOUT_SNOWSHOEING, "Snowshoeing"),
+    (WORKOUT_SNOWMOBILING, "Snowmobiling"),
+    (WORKOUT_STAND_UP_PADDLEBOARDING, "Stand Up Paddleboarding"),
+    (WORKOUT_SURFING, "Surfing"),
+    (WORKOUT_WAKEBOARDING, "Wakeboarding"),
+    (WORKOUT_WATER_SKIING, "Water Skiing"),
+    (WORKOUT_KAYAKING, "Kayaking"),
+    (WORKOUT_RAFTING, "Rafting"),
+    (WORKOUT_WINDSURFING, "Windsurfing"),
+    (WORKOUT_KITESURFING, "Kitesurfing"),
+    (WORKOUT_TACTICAL, "Tactical"),
+    (WORKOUT_JUMPMASTER, "Jumpmaster"),
+    (WORKOUT_BOXING, "Boxing"),
+    (WORKOUT_FLOOR_CLIMBING, "Floor Climbing"),
+    (WORKOUT_PICKLEBALL, "Pickleball"),
+    (WORKOUT_ALL, "All"),
+]

@@ -18,4 +18,4 @@ class FeedItem(models.Model):
     published_on = models.DateTimeField()
 
     class Meta:
-        ordering = ("published_on",)
+        ordering = ("-published_on",)

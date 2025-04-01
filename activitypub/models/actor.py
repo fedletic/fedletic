@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db import models
 from django.urls import reverse
 
-from activitypub.utils import generate_ulid
+from activitypub.utils import generate_ulid, get_image_mimetype
 
 
 class Actor(models.Model):
@@ -70,7 +70,19 @@ class Actor(models.Model):
         return "https://placehold.co/1200x300"
 
     @property
+    def header_mimetype(self):
+        if not self.header:
+            return None
+        return get_image_mimetype(self.icon)
+
+    @property
     def icon_uri(self):
         if self.icon:
             return self.icon.url
         return "https://placehold.co/64"
+
+    @property
+    def icon_mimetype(self):
+        if not self.icon:
+            return None
+        return get_image_mimetype(self.icon)

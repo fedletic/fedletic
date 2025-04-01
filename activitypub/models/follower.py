@@ -17,3 +17,6 @@ class Follower(models.Model):
     def accept(self):
         self.accepted = True
         self.save()
+
+    def __str__(self):
+        return f"{self.actor} -> {self.target}"

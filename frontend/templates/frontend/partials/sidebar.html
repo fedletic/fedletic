@@ -5,14 +5,14 @@
         <div class="mb-6">
             <div class="bg-gray-800 rounded-lg p-4">
                 <div class="flex items-start">
-                    <img class="w-16 h-16 rounded-lg bg-gray-300" src="https://placehold.co/64" alt="Profile">
+                    <img class="w-16 h-16 rounded-lg bg-gray-300" src="{{ request.user.actor.icon_uri }}" alt="Profile">
                     <div class="ml-3">
-                        <a href="{% url "frontend-profile" request.user.actor.webfinger %}">
-                            <div class="font-bold text-white capitalize">
+                        <a href="{% url "frontend-profile" request.user.actor.domainless_webfinger %}">
+                            <div class="font-bold text-white">
                                 {{ request.user.actor.name }}
                             </div>
                         </a>
-                        <div class="text-xs text-gray-400">@{{ request.user.actor.webfinger }}</div>
+                        <div class="text-xs text-gray-400">@{{ request.user.actor.domainless_webfinger }}</div>
                         <div class="flex mt-2 text-sm text-gray-400">
                             <div class="mr-4">
                                 <span class="font-bold text-white">{{ request.user.actor.following.count }}</span>
@@ -45,8 +45,13 @@
     {% endif %}
     <!-- Navigation Links -->
     <div class="space-y-1">
+        {% if request.user.is_authenticated %}
+            <a href="{% url "frontend-feed" %}" class="flex items-center px-4 py-2 text-white bg-gray-800 rounded-lg">
+                Your Feed
+            </a>
+        {% endif %}
         <a href="{% url "frontend-feed" %}" class="flex items-center px-4 py-2 text-white bg-gray-800 rounded-lg">
-            Feed
+            Public Feed
         </a>
     </div>
 
