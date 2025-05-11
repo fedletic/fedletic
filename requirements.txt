@@ -12,3 +12,5 @@ pillow==11.1.0  # Handling Image fields.
 django-oauth-toolkit==3.0.1  # OAuth provider
 djangorestframework==3.15.2  # API framework.
 bleach==6.2.0  # Sanitize HTML from remote profiles.
+celery==5.4.0  # Asynchronous task handler.
+redis==5.2.1  # For talking to celery.
