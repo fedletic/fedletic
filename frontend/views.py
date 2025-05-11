@@ -16,7 +16,7 @@ from activitypub.methods import (
 from activitypub.models import Actor
 from fedletic.models import FedleticUser
 from feeds.models import FeedItem
-from frontend.forms import LoginForm, ProfileEditForm, RegisterForm
+from frontend.forms import AccountEditForm, LoginForm, ProfileEditForm, RegisterForm
 from workouts.forms import CreateWorkoutForm
 from workouts.methods import create_workout
 from workouts.models import Workout
@@ -173,11 +173,22 @@ class RegisterView(View):
 class EditProfileView(View):
 
     def post(self, request):
-        form = ProfileEditForm(request.POST, request.FILES)
-        if form.is_valid():
-            updated_actor = form.save(request.user.actor)
-            updated_actor.save()  # Now this save will store the images
-            return self.get(request)
+        action = request.POST.get("action")
+        form = None
+
+        if action == "update_profile":
+            form = ProfileEditForm(request.POST, request.FILES)
+            if form.is_valid():
+                updated_actor = form.save(request.user.actor)
+                updated_actor.save()  # Now this save will store the images
+                return self.get(request)
+
+        if action == "update_account":
+            form = AccountEditForm(data=request.POST, user=request.user)
+
+            if form.is_valid():
+                form.save()
+
         return self.get(request, form=form)
 
     def get(self, request, form=None):

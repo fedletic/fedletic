@@ -48,6 +48,43 @@ class RegisterForm(forms.Form):
         return desired_email
 
 
+class AccountEditForm(forms.Form):
+    email = forms.EmailField(required=False)
+    password = forms.CharField(required=False)
+
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_password(self):
+        password = self.cleaned_data["password"]
+
+        if password and len(password) < 8:
+            raise ValidationError("Password must be at least 8 characters long.")
+        return password
+
+    def clean_email(self):
+        email = self.cleaned_data["email"]
+
+        # Unset if the user email has not changed.
+        if self.user.email == email:
+            return None
+
+        if FedleticUser.objects.filter(email=email).exists():
+            raise ValidationError("Email already in use")
+        return email
+
+    def save(self):
+        # TODO: confirmation of new address.
+        print(self.cleaned_data)
+        if email := self.cleaned_data.get("email"):
+            self.user.email = email
+            self.user.username = email
+        if password := self.cleaned_data.get("password"):
+            self.user.set_password(password)
+        self.user.save()
+
+
 class ProfileEditForm(forms.Form):
     AVATAR_MIN_SIZE = (128, 128)
     AVATAR_MAX_FILESIZE = 5
