@@ -1,0 +1,10 @@
+Hi, {{ username }}
+
+Thanks for signing up to Fedletic! Before you can use your account, we need to confirm your email address.
+
+Your verification code is {{ code }}
+
+Copy and paste this into a new tab, and you will be automatically logged in:
+
+{{ confirmation_url }}
+

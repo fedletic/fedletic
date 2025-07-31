@@ -17,6 +17,7 @@ from frontend.views import (
     LogoutView,
     ProfileView,
     RegisterView,
+    VerifyEmailView,
     WorkoutNoteView,
     WorkoutView,
 )
@@ -53,6 +54,11 @@ urlpatterns = [
     path("accounts/login", LoginView.as_view(), name="frontend-login"),
     path("accounts/logout", LogoutView.as_view(), name="frontend-logout"),
     path("accounts/register", RegisterView.as_view(), name="frontend-register"),
+    path(
+        "accounts/verify-email",
+        VerifyEmailView.as_view(),
+        name="frontend-verify-email",
+    ),
     path(
         "workouts/create/", CreateWorkoutView.as_view(), name="frontend-workout-create"
     ),

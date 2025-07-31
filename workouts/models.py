@@ -752,6 +752,11 @@ class Comment(models.Model):
     workout = models.ForeignKey(
         "workouts.Workout", related_name="comments", on_delete=models.CASCADE
     )
+    created_on = models.DateTimeField(auto_now_add=True)
+    updated_on = models.DateTimeField(auto_now=True)
+    response_to = models.ForeignKey(
+        "workouts.Comment", on_delete=models.CASCADE, null=True, blank=True
+    )
 
 
 class ImageAttachment(models.Model):

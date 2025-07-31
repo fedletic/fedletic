@@ -195,3 +195,14 @@ OAUTH2_PROVIDER = {
     },
     "ACCESS_TOKEN_EXPIRE_SECONDS": 60 * 60 * 24,  # 24 hours
 }
+
+# Email Settings
+EMAIL_SENDER = os.environ.get("EMAIL_SENDER")
+EMAIL_HOST = os.environ.get("EMAIL_HOST")
+EMAIL_PORT = os.environ.get("EMAIL_PORT")
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() == "true"
+
+# Post & Comment settings
+MAX_POST_CHARACTERS = os.environ.get("MAX_POST_CHARACTERS", 500)

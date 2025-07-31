@@ -1,4 +1,17 @@
 {% extends "frontend/base.html" %}
+{% block head %}
+    <script>
+        const main = () => {
+            const viewDetails = document.getElementById('view-details')
+            const details = document.getElementById('details')
+            viewDetails.addEventListener('click', () => {
+                details.classList.toggle('hidden')
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', main)
+    </script>
+{% endblock %}
 {% block content %}
     <div class="flex">
         <!-- Left Sidebar -->
@@ -60,9 +73,11 @@
                 {% endif %}
                 <!-- Detailed Stats Section -->
                 <div class="border-t border-gray-700 px-4 py-3">
-                    <h2 class="text-lg font-medium text-white mb-3">Detailed Stats</h2>
-
-                    <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <span class="text-lg font-medium text-white mb-3 inline">Detailed Stats</span>
+                        <span id="view-details" class="font-bold text-blue-600 cursor-pointer">[toggle]</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4 hidden" id="details">
                         {% for attribute in workout.workout_attributes %}
                             <div class="bg-gray-700 p-3 rounded-lg">
                                 <div class="text-sm text-gray-400 mb-1">{{ attribute.label }}</div>

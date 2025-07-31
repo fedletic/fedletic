@@ -11,6 +11,10 @@ from PIL import Image
 from fedletic.models import FedleticUser
 
 
+class VerifyEmailForm(forms.Form):
+    code = forms.CharField(max_length=6, required=True, label="Verification code")
+
+
 class LoginForm(forms.Form):
     username = forms.EmailField(
         max_length=64,

@@ -14,9 +14,16 @@ from activitypub.methods import (
     webfinger_lookup,
 )
 from activitypub.models import Actor
+from fedletic.methods import generate_and_send_verification_email, verify_email
 from fedletic.models import FedleticUser
 from feeds.models import FeedItem
-from frontend.forms import AccountEditForm, LoginForm, ProfileEditForm, RegisterForm
+from frontend.forms import (
+    AccountEditForm,
+    LoginForm,
+    ProfileEditForm,
+    RegisterForm,
+    VerifyEmailForm,
+)
 from workouts.forms import CreateWorkoutForm
 from workouts.methods import create_workout
 from workouts.models import Workout
@@ -36,6 +43,10 @@ def handle_register(request):
         username=form.cleaned_data["username"],
     )
     user.save()
+
+    # Users gotta verify their account.
+    generate_and_send_verification_email(user=user)
+
     return form, user
 
 
@@ -65,6 +76,7 @@ class LandingView(View):
             if not user:
                 return self.get(request, register_form=form)
             login(request, user)
+            return redirect(to=reverse("frontend-verify-email"))
 
         if action == "login":
             form, user = handle_login(request=request)
@@ -92,15 +104,19 @@ class LandingView(View):
 
 
 class FedleticView(View):
-    REQUIRES_AUTH = False
+    REQUIRES_AUTHENTICATED_USER = False
 
     def get_ap(self, request, **kwargs):
         raise NotImplementedError
 
     def dispatch(self, request: HttpRequest, *args, **kwargs):
 
-        if self.REQUIRES_AUTH and not request.user.is_authenticated:
+        if self.REQUIRES_AUTHENTICATED_USER and not request.user.is_authenticated:
             return redirect(to=reverse("frontend-landing"))
+
+        if self.request.user.is_authenticated and not request.user.email_verified:
+            # Authenticated users without a verified email go verify jail.
+            return redirect(to=reverse("frontend-verify-email"))
 
         # Handle actor extraction first
         actor = None
@@ -154,6 +170,52 @@ class LoginView(View):
         return render(request, "frontend/accounts/login.html", {"form": form})
 
 
+class VerifyEmailView(View):
+
+    def post(
+        self,
+        request,
+    ):
+        form = VerifyEmailForm(data=request.POST)
+
+        if not form.is_valid():
+            return render(
+                request, "frontend/accounts/verify-email.html", {"form": form}
+            )
+
+        challenge_passed = verify_email(
+            user=request.user, code=form.cleaned_data["code"]
+        )
+        if challenge_passed:
+            return redirect(to=reverse("frontend-feed"))
+
+        form.add_error(field="code", error="Invalid verification code.")
+        return render(request, "frontend/accounts/verify-email.html", {"form": form})
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            # If the user is not authenticated, they have to log in.
+            # TODO: Bad UX
+            return redirect(to=reverse("frontend-login"))
+
+        code = request.GET.get("code")
+        form = VerifyEmailForm()
+
+        if not code:
+            # No code? We have to prompt them to enter it manually.
+            return render(
+                request, "frontend/accounts/verify-email.html", {"form": form}
+            )
+
+        challenge_passed = verify_email(user=request.user, code=code)
+        if challenge_passed:
+            # If they passed the challenge, we send them to the frontend.
+            return redirect(to=reverse("frontend-feed"))
+
+        # If they didn't pass the challenge, we have to prompt them for the code manually.
+        return render(request, "frontend/accounts/verify-email.html", {"form": form})
+
+
 class RegisterView(View):
 
     def post(self, request):
@@ -170,7 +232,8 @@ class RegisterView(View):
         return render(request, "frontend/accounts/register.html", {"form": form})
 
 
-class EditProfileView(View):
+class EditProfileView(FedleticView):
+    REQUIRES_AUTHENTICATED_USER = True
 
     def post(self, request):
         action = request.POST.get("action")
