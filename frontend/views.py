@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
+from django.db.models import F
 from django.db.transaction import atomic
 from django.http import HttpRequest, HttpResponseNotFound, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render, reverse
@@ -26,7 +27,7 @@ from frontend.forms import (
 )
 from workouts.forms import CreateWorkoutForm
 from workouts.methods import create_workout
-from workouts.models import Workout
+from workouts.models import Comment, Like, Workout
 from workouts.tasks import process_workout
 
 
@@ -381,13 +382,73 @@ class WorkoutView(FedleticView):
         workout = Workout.objects.get(ap_id=workout_id, actor=request.actor)
         return JsonResponse(workout.as_activitypub_object())
 
-    def get(self, request, workout_id, **kwargs):
+    @atomic
+    def post(self, request, workout_id, **kwargs):
+        # Unauthenticated users cannot do anything (for now)
+        if not self.request.user.is_authenticated:
+            return self.get(request, workout_id, **kwargs)
+
         workout = Workout.objects.get(ap_id=workout_id, actor=request.actor)
+        action = request.POST.get("action")
+        if action == "add_comment":
+            Comment.objects.create(
+                actor=request.user.actor,
+                workout=workout,
+                content=request.POST.get("comment"),
+            )
+            Workout.objects.filter(pk=workout.pk).update(
+                comment_count=F("comment_count") + 1
+            )
+
+        if action == "add_like":
+            _, created = Like.objects.get_or_create(
+                workout=workout,
+                actor=request.user.actor,
+            )
+
+            if created:
+                Workout.objects.filter(pk=workout.pk).update(
+                    like_count=F("like_count") + 1
+                )
+
+        if action == "remove_like":
+            like = Like.objects.filter(
+                workout=workout,
+                actor=request.user.actor,
+            ).first()
+
+            if like:
+                like.delete()
+                Workout.objects.filter(pk=workout.pk).update(
+                    like_count=F("like_count") - 1
+                )
+
+        return self.get(request, workout_id, **kwargs)
+
+    def get(self, request, workout_id, **kwargs):
+        # TODO: prefetch/select related
+        workout = Workout.objects.get(ap_id=workout_id, actor=request.actor)
+        comments = workout.comments.all().order_by(
+            "created_on"
+        )  # Oldest comments first.
+        likes = workout.likes.all()[
+            0:20
+        ]  # We get at most 20 likes, otherwise the list becomes too long.
+
+        # Check if the current user has liked this workout
+        user_has_liked = False
+        if request.user.is_authenticated:
+            user_has_liked = workout.likes.filter(actor=request.user.actor).exists()
 
         return render(
             request,
             "frontend/workouts/view.html",
-            {"workout": workout},
+            {
+                "workout": workout,
+                "comments": comments,
+                "likes": likes,
+                "user_has_liked": user_has_liked,
+            },
         )
 
 

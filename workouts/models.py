@@ -547,6 +547,8 @@ class Workout(
     workout_type = models.CharField(
         max_length=50, choices=WORKOUT_TYPES_CHOICES, db_index=True
     )
+    comment_count = models.IntegerField(default=0)
+    like_count = models.IntegerField(default=0)
 
     class Meta:
         ordering = ("start_time", "id")
@@ -757,6 +759,17 @@ class Comment(models.Model):
     response_to = models.ForeignKey(
         "workouts.Comment", on_delete=models.CASCADE, null=True, blank=True
     )
+
+
+class Like(models.Model):
+    ap_id = models.CharField(max_length=255, default=generate_ulid)
+    ap_uri = models.URLField(max_length=1024, null=True, blank=True)
+    local_uri = models.URLField(max_length=1024, null=True, blank=True)
+    created_on = models.DateTimeField(auto_now_add=True)
+    workout = models.ForeignKey(
+        "workouts.Workout", related_name="likes", on_delete=models.CASCADE
+    )
+    actor = models.ForeignKey("activitypub.Actor", on_delete=models.CASCADE)
 
 
 class ImageAttachment(models.Model):

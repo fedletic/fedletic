@@ -53,11 +53,13 @@
     </a>
     <!-- Post Actions -->
     <div class="flex border-t border-gray-700 divide-x divide-gray-700">
-        <button class="flex-1 py-2 text-center text-sm font-medium text-gray-400 hover:bg-gray-700 focus:outline-none">
-            2 Likes
-        </button>
-        <button class="flex-1 py-2 text-center text-sm font-medium text-gray-400 hover:bg-gray-700 focus:outline-none">
-            2 Comments
-        </button>
+        <a href="{{ workout.local_uri }}"
+           class="flex-1 py-2 text-center text-sm font-medium text-gray-400 hover:bg-gray-700 focus:outline-none">
+            {{ workout.like_count }} Likes
+        </a>
+        <a href="{{ workout.local_uri }}"
+           class="flex-1 py-2 text-center text-sm font-medium text-gray-400 hover:bg-gray-700 focus:outline-none">
+            {{ workout.comment_count }} Comments
+        </a>
     </div>
 </div>
