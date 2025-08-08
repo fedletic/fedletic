@@ -16,6 +16,7 @@ class Command(BaseCommand):
         self.stdout.write(f"recounting likes and comments for workout {workout.pk}")
         workout.like_count = workout.likes.count()
         workout.comment_count = workout.comments.count()
+        workout.save()
 
     def handle(self, *args, **options):
         # Command implementation goes here
