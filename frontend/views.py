@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.db.models import F
 from django.db.transaction import atomic
-from django.http import HttpRequest, HttpResponseNotFound, JsonResponse
+from django.http import Http404, HttpRequest, HttpResponseNotFound, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render, reverse
 from django.views import View
 from rest_framework import status
@@ -25,6 +25,7 @@ from frontend.forms import (
     RegisterForm,
     VerifyEmailForm,
 )
+from workouts.consts import WORKOUT_STATUS_FINISHED
 from workouts.forms import CreateWorkoutForm
 from workouts.methods import create_workout
 from workouts.models import Comment, Like, Workout
@@ -427,7 +428,15 @@ class WorkoutView(FedleticView):
 
     def get(self, request, workout_id, **kwargs):
         # TODO: prefetch/select related
-        workout = Workout.objects.get(ap_id=workout_id, actor=request.actor)
+        try:
+            workout = Workout.objects.get(ap_id=workout_id, actor=request.actor)
+        except Workout.DoesNotExist:
+            raise Http404
+        if workout.status != WORKOUT_STATUS_FINISHED:
+            return render(
+                request, "frontend/workouts/pending.html", {"workout": workout}
+            )
+
         comments = workout.comments.all().order_by(
             "created_on"
         )  # Oldest comments first.
