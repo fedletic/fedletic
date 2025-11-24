@@ -19,6 +19,18 @@ else is subject to change.
 
 You can now use the built-in development server to run `./manage.py runserver`
 
+### Running Fedletic
+
+#### In Development
+
+* You can use the built-in development server that Django provides by running `./manage.py runserver`
+* ActivityPub messages and workouts are being handled asynchronously with celery. Start it with
+  `celery -A fedletic worker -l DEBUG`
+
+#### In Production
+
+* Don't.
+
 ### Docker
 
 *Coming soon*
